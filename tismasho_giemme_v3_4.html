@@ -1,0 +1,1690 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TISMASHO — GIEMME BEVANDE Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+if(typeof pdfjsLib !== 'undefined') {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+</script>
+<style>
+:root {
+  --blue-deep:#0d2a4a; --blue:#1a3a5c; --blue-light:#e3edf7; --blue-mid:#2980b9;
+  --amber:#e67e22; --amber-light:#fef3e2; --amber-mid:#f39c12;
+  --green:#1a6b3c; --green-light:#e8f5e9; --green-mid:#4caf50;
+  --red:#c0392b; --red-light:#fce4e4;
+  --yellow:#fff8e1; --gray:#f4f6f9; --border:#dde1e6;
+  --text:#1c1c1e; --muted:#6c757d; --white:#ffffff;
+  --shadow:0 1px 4px rgba(0,0,0,0.06),0 2px 12px rgba(0,0,0,0.04);
+  --radius:10px;
+  --font:'DM Sans',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);font-size:13px;background:var(--gray);color:var(--text);min-height:100vh}
+
+/* TOPBAR — amber/dark theme for GIEMME */
+.topbar{background:linear-gradient(135deg,#1a2a3a 0%,#0d1f2d 100%);color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 28px;height:56px;box-shadow:0 2px 12px rgba(0,0,0,.25)}
+.topbar-brand{display:flex;align-items:center;gap:14px}
+.topbar-brand h1{font-size:17px;font-weight:700;letter-spacing:-.3px}
+.topbar-brand .brand-badge{background:var(--amber);color:#fff;padding:3px 10px;border-radius:5px;font-size:10px;font-weight:800;letter-spacing:.8px}
+.topbar-actions{display:flex;gap:10px;align-items:center}
+
+/* TABS — amber accent */
+.tabs{background:var(--blue);display:flex;padding:0 28px;overflow-x:auto;gap:2px}
+.tab{padding:12px 20px;color:rgba(255,255,255,.6);cursor:pointer;font-size:12px;font-weight:600;border-bottom:3px solid transparent;white-space:nowrap;transition:all .2s;letter-spacing:.2px}
+.tab:hover{color:#fff;background:rgba(255,255,255,.06)}
+.tab.active{color:#fff;border-bottom-color:var(--amber)}
+.badge{background:var(--red);color:#fff;border-radius:9px;padding:1px 6px;font-size:10px;margin-left:5px;font-weight:700}
+
+.page{display:none;padding:24px 28px;max-width:1440px;margin:0 auto}
+.page.active{display:block}
+
+.card{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:18px;overflow:hidden;border:1px solid var(--border)}
+.card-head{padding:13px 20px;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:space-between;letter-spacing:.2px;border-bottom:1px solid var(--border)}
+.card-head.blue{background:var(--blue);color:#fff;border:none}
+.card-head.amber{background:var(--amber);color:#fff;border:none}
+.card-head.green{background:var(--green);color:#fff;border:none}
+.card-head.dark{background:var(--blue-deep);color:#fff;border:none}
+.card-head.neutral{background:#f8f9fa;color:var(--text)}
+.card-head.red{background:var(--red);color:#fff;border:none}
+.card-body{padding:20px}
+
+.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:18px}
+.stat{background:var(--white);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow);border:1px solid var(--border);border-top:3px solid var(--amber-mid);transition:transform .15s}
+.stat:hover{transform:translateY(-2px)}
+.stat.b{border-top-color:var(--blue-mid)}.stat.g{border-top-color:var(--green-mid)}.stat.r{border-top-color:var(--red)}.stat.d{border-top-color:var(--blue-deep)}
+.stat-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:700;letter-spacing:.5px;margin-bottom:6px}
+.stat-val{font-size:24px;font-weight:700;color:var(--blue);font-family:var(--mono)}
+.stat-sub{font-size:10px;color:var(--muted);margin-top:4px}
+
+.btn{display:inline-flex;align-items:center;gap:5px;padding:8px 16px;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:600;transition:all .15s;font-family:var(--font)}
+.btn-amber{background:var(--amber);color:#fff}.btn-amber:hover{background:#d35400}
+.btn-blue{background:var(--blue);color:#fff}.btn-blue:hover{background:#122d47}
+.btn-green{background:var(--green);color:#fff}.btn-green:hover{background:#145a32}
+.btn-ghost{background:transparent;color:var(--blue);border:1.5px solid var(--border)}.btn-ghost:hover{background:var(--blue-light)}
+.btn-red{background:var(--red);color:#fff}.btn-red:hover{background:#a93226}
+.btn-sm{padding:5px 10px;font-size:11px}
+
+.dtable{width:100%;border-collapse:collapse;font-size:12px}
+.dtable th{background:#f8f9fa;color:var(--text);padding:10px 12px;font-size:11px;text-align:left;white-space:nowrap;border-bottom:2px solid var(--border);font-weight:700;text-transform:uppercase;letter-spacing:.3px;position:sticky;top:0;z-index:1}
+.dtable td{padding:9px 12px;border-bottom:1px solid #f0f1f3;vertical-align:middle}
+.dtable tr:hover td{background:#fef9f3}
+.dtable tfoot td{background:#f8f9fa;font-weight:700;border-top:2px solid var(--border)}
+.dtable.amber th{background:var(--amber);color:#fff}
+.dtable.blue th{background:var(--blue);color:#fff}
+.dtable.dark th{background:var(--blue-deep);color:#fff}
+
+/* Store pills */
+.pill{display:inline-block;padding:3px 10px;border-radius:12px;font-size:10px;font-weight:700;letter-spacing:.2px}
+.pTRASTEVERE{background:#dce6f1;color:#1f4e79}.pPIAZZA{background:#e2efda;color:#375623}
+.pPONTE{background:#fce4d6;color:#7b3f00}.pTUSCOLANA{background:#ede7f6;color:#4b0082}
+
+.alert{padding:12px 16px;border-radius:8px;margin-bottom:14px;font-size:12px;display:flex;align-items:flex-start;gap:8px;line-height:1.5}
+.alert-info{background:var(--blue-light);color:var(--blue);border:1px solid #b8d4f0}
+.alert-ok{background:var(--green-light);color:#1a5c2e;border:1px solid #a5d6a7}
+.alert-warn{background:var(--yellow);color:#7b5c00;border:1px solid #f0d68a}
+.alert-err{background:var(--red-light);color:var(--red);border:1px solid #e8a0a0}
+.alert-amber{background:var(--amber-light);color:#8a4a00;border:1px solid #f5cba7}
+
+.abadge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:12px;font-size:10px;font-weight:700}
+.a-certa{background:var(--red-light);color:var(--red)}.a-warn{background:var(--yellow);color:#7b5c00}.a-ok{background:var(--green-light);color:var(--green)}
+
+.tr{text-align:right}.tc{text-align:center}.fb{font-weight:700}
+.muted{color:var(--muted)}.gap8{gap:8px}
+.flex{display:flex}.flexb{display:flex;justify-content:space-between;align-items:center}
+.mt8{margin-top:8px}.mt14{margin-top:14px}.mt20{margin-top:20px}
+.scroll-x{overflow-x:auto}.scroll-y{overflow-y:auto}
+.divider{height:1px;background:var(--border);margin:16px 0}
+.section-hd{font-size:14px;font-weight:700;color:var(--blue);margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid var(--blue-light)}
+.mono{font-family:var(--mono)}
+
+/* Sconti badge */
+.sconti-chain{font-size:10px;color:var(--muted);font-family:var(--mono)}
+.sc-merce{background:#e8f5e9;color:#2e7d32;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700}
+
+/* Upload / dropzone */
+.dropzone{border:2.5px dashed var(--border);border-radius:var(--radius);padding:40px 20px;text-align:center;cursor:pointer;transition:all .2s;background:#fafafa;position:relative}
+.dropzone:hover,.dropzone.drag{border-color:var(--amber);background:var(--amber-light)}
+.dropzone.success{border-color:var(--green);background:var(--green-light)}
+.dropzone.error{border-color:var(--red);background:var(--red-light)}
+.dz-icon{font-size:44px;margin-bottom:10px;display:block}
+.dz-title{font-size:15px;font-weight:700;color:var(--blue);margin-bottom:6px}
+.dz-sub{font-size:11px;color:var(--muted)}.dz-file{font-size:12px;color:var(--green);font-weight:700;margin-top:6px}
+.prog-wrap{margin-top:14px;display:none}
+.prog-label{font-size:12px;font-weight:600;color:var(--blue);margin-bottom:5px}
+.prog-bar{height:7px;background:var(--border);border-radius:4px;overflow:hidden}
+.prog-fill{height:100%;background:var(--amber);border-radius:4px;transition:width .35s}
+
+/* Steps */
+.steps{display:flex;gap:0;margin-bottom:20px}
+.step{flex:1;padding:10px 16px;background:#fff;border:1.5px solid var(--border);font-size:11px;font-weight:600;color:var(--muted);display:flex;align-items:center;gap:8px;border-right:none;position:relative}
+.step:last-child{border-right:1.5px solid var(--border);border-radius:0 6px 6px 0}
+.step:first-child{border-radius:6px 0 0 6px}
+.step.done{background:var(--green-light);border-color:var(--green-mid);color:var(--green)}
+.step.active{background:var(--amber-light);border-color:var(--amber);color:#8a4a00}
+.step-num{width:22px;height:22px;border-radius:50%;background:var(--border);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.step.done .step-num{background:var(--green)}.step.active .step-num{background:var(--amber)}
+
+/* Preview table */
+.ptable{width:100%;border-collapse:collapse;font-size:12px}
+.ptable th{background:var(--blue);color:#fff;padding:8px 10px;font-size:11px;text-align:left;white-space:nowrap}
+.ptable td{padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
+.ptable tr:nth-child(even) td{background:#fafafa}
+.ptable tr:last-child td{background:#f0f4f0;font-weight:700}
+.ptable input{padding:4px 6px;font-size:11px;width:100%;border:1.5px solid var(--border);border-radius:4px;font-family:var(--font)}
+
+/* Form */
+.frow{display:grid;gap:10px;margin-bottom:10px}
+.c2{grid-template-columns:1fr 1fr}.c3{grid-template-columns:1fr 1fr 1fr}.c4{grid-template-columns:1fr 1fr 1fr 1fr}
+label{display:block;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px}
+input,select{width:100%;padding:7px 9px;border:1.5px solid var(--border);border-radius:4px;font-size:12px;font-family:var(--font);background:#fafafa;transition:border .15s}
+input:focus,select:focus{outline:none;border-color:var(--amber);background:#fff}
+
+/* Weekly */
+.wk-block{margin-bottom:20px;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.wk-head{padding:10px 16px;font-weight:700;font-size:12px;display:flex;justify-content:space-between;align-items:center}
+.wk1 .wk-head{background:#dce6f1;color:#1f4e79}.wk2 .wk-head{background:#fce4d6;color:#7b3f00}
+.wk3 .wk-head{background:#e2efda;color:#375623}.wk4 .wk-head{background:#fff2cc;color:#7b5c00}
+.expand-btn{cursor:pointer;user-select:none}.expand-content{display:none}.expand-content.open{display:block}
+.anom-detail{background:#fafafa;border-radius:6px;padding:10px 14px;margin-top:6px;font-size:11px;line-height:1.6;white-space:pre-wrap;color:#555}
+
+/* Filter bar */
+.filter-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.filter-bar select,.filter-bar input{padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;font-family:var(--font);background:#fff}
+.filter-bar select:focus,.filter-bar input:focus{outline:none;border-color:var(--amber)}
+
+.vlist{list-style:none;padding:0}.vlist li{padding:6px 0;font-size:12px;color:#2e7d32;display:flex;align-items:flex-start;gap:6px}.vlist li::before{content:'✅';flex-shrink:0}
+.nc-item{padding:8px 12px;border-left:3px solid var(--amber);margin-bottom:8px;background:#fef9f3;border-radius:0 6px 6px 0;font-size:12px}
+
+/* Modal */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;display:none;align-items:center;justify-content:center}
+.modal-bg.open{display:flex}
+.modal{background:#fff;border-radius:10px;padding:24px;max-width:560px;width:92%;box-shadow:0 8px 32px rgba(0,0,0,.22);max-height:90vh;overflow-y:auto}
+.modal h3{font-size:15px;color:var(--blue);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.modal-foot{margin-top:18px;display:flex;justify-content:flex-end;gap:10px}
+
+/* Omaggio row */
+.omaggio-row td{background:#f0faf0!important;color:#2e7d32;font-style:italic}
+
+@media(max-width:1100px){.stats{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:768px){.stats{grid-template-columns:1fr 1fr}.filter-bar{flex-direction:column}.c4,.c3{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-brand">
+    <div>
+      <h1>🍺 TISMASHO — GIEMME BEVANDE &nbsp;<span class="brand-badge">BEVANDE</span></h1>
+      <span id="topbarInfo" style="font-size:11px;opacity:.7">Giemme Bevande · 4 store · Carica le prime fatture PDF</span>
+    </div>
+  </div>
+  <div class="topbar-actions">
+    <span id="syncStatus" style="display:none;font-size:11px;padding:3px 10px;border-radius:5px;background:rgba(255,255,255,.1)"></span>
+    <button class="btn btn-amber btn-sm" onclick="exportExcel()">⬇ Esporta Excel</button>
+    <button class="btn btn-sm" style="background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.4);font-size:11px" onclick="saveDB()">💾 Salva</button>
+
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('dashboard')">📊 Dashboard</div>
+  <div class="tab" onclick="showTab('carica')">📄 Carica PDF</div>
+  <div class="tab" onclick="showTab('store')">🏪 Dettaglio Store</div>
+  <div class="tab" onclick="showTab('ordini')">📋 Tutti gli Ordini</div>
+  <div class="tab" onclick="showTab('settimane')">📅 Riepilogo Settimanale</div>
+  <div class="tab" onclick="showTab('anomalie')">⚠️ Anomalie <span class="badge" id="anomBadge">0</span></div>
+  <div class="tab" onclick="showTab('omaggi')">🎁 Omaggi <span class="badge" id="omaggiBadge">0</span></div>
+  <div class="tab" onclick="showTab('credito')">📝 Note di Credito</div>
+  <div class="tab" onclick="showTab('listino_concordato')">📋 Listino Concordato</div>
+  <div class="tab" onclick="showTab('listino')">⚙ Anagrafica Prodotti</div>
+</div>
+
+<!-- ===== DASHBOARD ===== -->
+<div id="page-dashboard" class="page active">
+  <div class="stats" id="statsGrid"></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
+    <div class="card"><div class="card-head amber">🍺 Riepilogo per Store</div>
+      <div class="scroll-x"><table class="dtable amber"><thead><tr><th>Store</th><th>N° Fatture</th><th class="tr">Imponibile €</th><th class="tr">IVA €</th><th class="tr">Totale €</th><th class="tr">%</th></tr></thead><tbody id="riepilogoBody"></tbody><tfoot id="riepilogoFoot"></tfoot></table></div>
+    </div>
+    <div class="card"><div class="card-head red">⚠️ Anomalie — Sintesi</div><div class="card-body" id="dashAnom" style="max-height:320px;overflow-y:auto"></div></div>
+  </div>
+  <div class="card"><div class="card-head green">🚚 Spese di Trasporto</div>
+    <div class="scroll-x"><table class="dtable green"><thead><tr><th>Store</th><th class="tr">N° Fatture con trasporto</th><th class="tr">Totale trasporto €</th><th class="tr">Media per fattura €</th></tr></thead><tbody id="traspBody"></tbody><tfoot id="traspFoot"></tfoot></table></div>
+  </div>
+  <div class="card"><div class="card-head blue">📋 Ultime fatture</div>
+    <div class="scroll-x" style="max-height:400px;overflow-y:auto"><table class="dtable blue"><thead><tr><th>N° Fattura</th><th>Store</th><th>Data</th><th>Scad.</th><th>Rif. Ordine</th><th>Righe</th><th class="tr">Imp. €</th><th class="tr">IVA €</th><th class="tr">Tot. €</th><th>Fonte</th></tr></thead><tbody id="dashOrders"></tbody></table></div>
+  </div>
+</div>
+
+<!-- ===== CARICA PDF ===== -->
+<div id="page-carica" class="page">
+  <div class="steps">
+    <div class="step active" id="st1"><div class="step-num">1</div>Carica PDF</div>
+    <div class="step" id="st2"><div class="step-num">2</div>Verifica dati</div>
+    <div class="step" id="st3"><div class="step-num">3</div>Conferma e salva</div>
+  </div>
+  <div id="step1Block">
+    <div class="card"><div class="card-head amber">📁 Trascina o seleziona il PDF fattura Giemme</div>
+      <div class="card-body">
+        <div class="alert alert-amber">🍺 Formato supportato: <strong>Fattura Accompagnatoria GIEMME BEVANDE</strong> — il parser calcola automaticamente il <strong>prezzo netto dopo tutti gli sconti a cascata</strong> e identifica le righe SC.MERCE (omaggi).</div>
+        <div class="dropzone" id="dz" onclick="document.getElementById('pdfInput').click()" ondragover="dzOver(event)" ondragleave="dzLeave()" ondrop="dzDrop(event)">
+          <span class="dz-icon">📄</span>
+          <div class="dz-title">Clicca qui o trascina il PDF fattura Giemme</div>
+          <div class="dz-sub">File .pdf · Fattura Accompagnatoria Giemme Bevande</div>
+          <div class="dz-file" id="dzFileName"></div>
+        </div>
+        <input type="file" id="pdfInput" accept=".pdf" style="display:none" onchange="loadPDF(event)">
+        <div class="prog-wrap" id="progWrap"><div class="prog-label" id="progLabel">Lettura PDF...</div><div class="prog-bar"><div class="prog-fill" id="progFill" style="width:0%"></div></div></div>
+        <div id="parseError"></div>
+        <div id="debugPanel" style="display:none;margin-top:10px">
+          <div class="flexb" style="margin-bottom:6px">
+            <span style="font-size:11px;font-weight:700;color:var(--muted)">🔍 DEBUG — Testo grezzo estratto dal PDF</span>
+            <button class="btn btn-ghost btn-sm" onclick="document.getElementById('debugPanel').style.display='none'">✕ Chiudi</button>
+          </div>
+          <textarea id="debugText" style="width:100%;height:220px;font-family:monospace;font-size:11px;border:1.5px solid var(--border);border-radius:6px;padding:8px;background:#f8f9fa;resize:vertical" readonly></textarea>
+        </div>
+        <div class="divider"></div>
+        <div class="flexb"><span style="font-size:11px;font-weight:700;color:var(--muted)">📦 IMPORTAZIONE MULTIPLA</span>
+          <button class="btn btn-ghost btn-sm" onclick="document.getElementById('pdfMulti').click()">+ Seleziona più PDF</button>
+        </div>
+        <input type="file" id="pdfMulti" accept=".pdf" multiple style="display:none" onchange="loadMulti(event)">
+        <div id="multiQueue" style="margin-top:10px"></div>
+      </div>
+    </div>
+  </div>
+  <div id="step2Block" style="display:none">
+    <div class="card"><div class="card-head green flexb" id="step2Head">
+        <span>✅ Dati estratti — Verifica e correggi</span>
+        <button class="btn btn-ghost btn-sm" style="color:#fff;border-color:rgba(255,255,255,.5)" onclick="backToStep1()">← Carica altro PDF</button>
+      </div>
+      <div class="card-body">
+        <div class="frow c4">
+          <div><label>N° Fattura</label><input id="prev_num" type="text"></div>
+          <div><label>Store</label><select id="prev_store"><option>TRASTEVERE</option><option>PIAZZA ISTRIA</option><option>PONTE MILVIO</option><option>TUSCOLANA</option></select></div>
+          <div><label>Data Fattura</label><input id="prev_data" type="text" placeholder="dd/mm/yyyy"></div>
+          <div><label>Data Scadenza</label><input id="prev_cons" type="text" placeholder="dd/mm/yyyy"></div>
+        </div>
+        <div class="frow c3">
+          <div><label>Rif. Ordine</label><input id="prev_op" type="text" placeholder="es. 102 del 05/01/2026"></div>
+          <div><label>Pagamento</label><input id="prev_pag" type="text" placeholder="es. RIM.DIR. FINE MESE"></div>
+          <div><label>Trasporto €</label><input id="prev_trasp" type="number" step="0.01" placeholder="1.00"></div>
+        </div>
+        <div class="divider"></div>
+        <div class="flexb" style="margin-bottom:10px">
+          <div class="section-hd" style="margin:0">Righe articolo</div>
+          <div class="alert alert-amber" style="margin:0;padding:6px 12px;font-size:11px">
+            🧮 Prezzi già calcolati al netto di tutti gli sconti a cascata · Righe <strong>SC.MERCE</strong> = omaggio, escluse dal totale
+          </div>
+        </div>
+        <div style="overflow-x:auto"><table class="ptable">
+          <thead><tr><th>#</th><th>Cod.</th><th>Descrizione</th><th>UM</th><th>Qtà</th><th>Prezzo listino €</th><th>Sconti</th><th>Prezzo netto €/cassa</th><th>Pz/cassa</th><th>€/pz</th><th>IVA %</th><th>Importo €</th><th>Omaggio</th><th></th></tr></thead>
+          <tbody id="prevRows"></tbody>
+          <tfoot><tr><td colspan="9" style="padding:8px 10px;font-size:11px">TOTALE IMPONIBILE (esclusi omaggi)</td><td id="prevTotImp" style="padding:8px 10px;font-weight:700;text-align:right"></td><td colspan="2"></td></tr></tfoot>
+        </table></div>
+        <div class="mt8 flex gap8" style="justify-content:flex-end"><button class="btn btn-ghost btn-sm" onclick="addPrevRow()">+ Aggiungi riga</button></div>
+      </div>
+    </div>
+    <div id="anomalyCheck"></div>
+    <div class="card"><div class="card-body flexb">
+      <div id="prevTotals" style="font-size:13px"></div>
+      <div class="flex gap8"><button class="btn btn-ghost" onclick="backToStep1()">← Annulla</button><button class="btn btn-green" onclick="confirmSave()">✅ Conferma e salva</button></div>
+    </div></div>
+  </div>
+  <div id="step3Block" style="display:none">
+    <div class="card"><div class="card-head green">🎉 Fattura salvata con successo</div>
+      <div class="card-body"><div id="saveConfirmMsg"></div>
+        <div class="mt14 flex gap8">
+          <button class="btn btn-amber" onclick="backToStep1()">📄 Carica nuova fattura</button>
+          <button class="btn btn-blue" onclick="exportExcel()">⬇ Esporta Excel</button>
+          <button class="btn btn-ghost" onclick="showTab('ordini')">📋 Vedi fatture</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== DETTAGLIO STORE ===== -->
+<div id="page-store" class="page">
+  <div class="filter-bar" style="margin-bottom:16px"><select id="storeFilter" onchange="renderStoreDetail()" style="min-width:200px">
+    <option value="TRASTEVERE">TRASTEVERE</option><option value="PIAZZA ISTRIA">PIAZZA ISTRIA</option><option value="PONTE MILVIO">PONTE MILVIO</option><option value="TUSCOLANA">TUSCOLANA</option>
+  </select></div>
+  <div id="storeDetailOut"></div>
+</div>
+
+<!-- ===== TUTTI GLI ORDINI ===== -->
+<div id="page-ordini" class="page">
+  <div class="card"><div class="card-head neutral flexb">
+    <span>📋 Storico fatture completo</span>
+    <div class="filter-bar">
+      <input id="searchOrd" type="text" placeholder="🔍 cerca..." style="width:160px" oninput="renderAllOrders()">
+      <select id="filterOrdStore" onchange="renderAllOrders()" style="width:150px"><option value="">Tutti gli store</option><option>TRASTEVERE</option><option>PIAZZA ISTRIA</option><option>PONTE MILVIO</option><option>TUSCOLANA</option></select>
+      <select id="filterOrdSource" onchange="renderAllOrders()" style="width:130px"><option value="">Tutte le fonti</option><option value="pdf">PDF</option><option value="storico">Storico</option></select>
+      <button class="btn btn-red btn-sm" onclick="deleteAllOrders()">🗑 Elimina tutte</button>
+    </div>
+  </div>
+  <div class="scroll-y" style="max-height:600px"><table class="dtable amber">
+    <thead><tr><th>N° Fattura</th><th>Store</th><th>Data</th><th>Scad.</th><th>Rif. Ordine</th><th>Righe</th><th class="tr">Imp. €</th><th class="tr">IVA €</th><th class="tr">Tot. €</th><th>Fonte</th><th></th></tr></thead>
+    <tbody id="ordersBody"></tbody>
+    <tfoot><tr id="ordersFoot"><td colspan="11"></td></tr></tfoot>
+  </table></div></div>
+  <div id="orderDetail"></div>
+</div>
+
+<!-- ===== RIEPILOGO SETTIMANALE ===== -->
+<div id="page-settimane" class="page">
+  <div class="filter-bar" style="margin-bottom:16px">
+    <select id="weekStore" onchange="renderWeekly()" style="min-width:200px"><option value="">Tutti gli store</option><option value="TRASTEVERE">TRASTEVERE</option><option value="PIAZZA ISTRIA">PIAZZA ISTRIA</option><option value="PONTE MILVIO">PONTE MILVIO</option><option value="TUSCOLANA">TUSCOLANA</option></select>
+    <select id="monthSel" onchange="renderWeekly()" style="min-width:180px"><option value="">Tutti i mesi</option></select>
+  </div>
+  <div id="weeklyOut"></div>
+</div>
+
+<!-- ===== ANOMALIE ===== -->
+<div id="page-anomalie" class="page">
+  <div class="card"><div class="card-head neutral flexb">
+    <span>⚠️ Anomalie rilevate</span>
+    <div class="filter-bar">
+      <select id="fAnomCat" onchange="renderAnom()" style="min-width:140px"><option value="">Tutte</option><option>PREZZO</option><option>SCOSTAMENTO</option><option>QUANTITÀ</option><option>NOME PRODOTTO</option><option>DATI MANCANTI</option></select>
+      <select id="fAnomCert" onchange="renderAnom()" style="min-width:140px"><option value="">Tutte</option><option value="CERTA">🔴 Certe</option><option value="DA VERIFICARE">🟡 Da verificare</option></select>
+    </div>
+  </div><div class="scroll-y" style="max-height:600px"><div id="anomBody" class="card-body"></div></div></div>
+  <div class="card mt20"><div class="card-head green">✅ Verifiche con esito positivo</div><div class="card-body"><ul class="vlist" id="verifList"></ul></div></div>
+</div>
+
+<!-- ===== NOTE DI CREDITO ===== -->
+<!-- ===== OMAGGI ===== -->
+<div id="page-omaggi" class="page">
+  <div class="card">
+    <div class="card-head green flexb">
+      <span>🎁 Omaggi ricevuti (SC.MERCE)</span>
+      <div class="filter-bar">
+        <select id="fOmaggiStore" onchange="renderOmaggi()" style="min-width:150px"><option value="">Tutti gli store</option><option>TRASTEVERE</option><option>PIAZZA ISTRIA</option><option>PONTE MILVIO</option><option>TUSCOLANA</option></select>
+      </div>
+    </div>
+    <div class="scroll-x"><table class="dtable green">
+      <thead><tr><th>Data</th><th>Fattura</th><th>Store</th><th>Cod.</th><th>Descrizione</th><th>UM</th><th class="tc">Qtà</th><th class="tr">Val. listino €</th></tr></thead>
+      <tbody id="omaggiBody"></tbody>
+      <tfoot id="omaggiFoot"></tfoot>
+    </table></div>
+  </div>
+</div>
+
+<div id="page-credito" class="page">
+  <div class="card"><div class="card-head green">📝 Note di Credito</div><div class="card-body" id="creditoBody"></div></div>
+</div>
+
+<!-- ===== LISTINO CONCORDATO ===== -->
+<div id="page-listino_concordato" class="page">
+  <div class="card">
+    <div class="card-head amber flexb">
+      <span>📋 Listino Concordato Giemme Bevande — prezzi di riferimento (<span id="lcCount">0</span> prodotti)</span>
+      <input id="searchLC" type="text" placeholder="🔍 cerca..." style="width:180px;padding:5px 10px;border:1px solid rgba(255,255,255,.3);border-radius:5px;background:rgba(255,255,255,.15);color:#fff;font-size:12px" oninput="renderListinoConcordato()">
+    </div>
+    <div class="scroll-y" style="max-height:580px">
+      <table class="dtable amber">
+        <thead><tr><th>Codice</th><th>Descrizione</th><th>UM</th><th class="tr">Prezzo Netto €</th><th>IVA %</th><th class="tr">Scostamenti rilevati</th></tr></thead>
+        <tbody id="listinoBody"></tbody>
+      </table>
+    </div>
+    <div class="card-body" style="border-top:1px solid var(--border);padding:10px 18px">
+      <span class="muted" style="font-size:11px">💡 Prezzi netti concordati (dopo sconti). Qualsiasi fattura con prezzo diverso viene segnalata come <strong>anomalia PREZZO 🔴 CERTA</strong>. Aggiungere manualmente i prodotti concordati usando il pulsante.</span>
+      <button class="btn btn-amber btn-sm" style="margin-left:12px" onclick="openLCModal()">+ Aggiungi prodotto concordato</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== ANAGRAFICA PRODOTTI ===== -->
+<div id="page-listino" class="page">
+  <div class="card"><div class="card-head neutral flexb">
+    <span>🗂 Anagrafica Prodotti — storico prezzi netti da fatture</span>
+    <button class="btn btn-amber btn-sm" onclick="openProdModal()">+ Nuovo prodotto</button>
+    <button class="btn btn-red btn-sm" onclick="clearAllProds()">🗑 Svuota anagrafica</button>
+  </div>
+  <div class="scroll-y" style="max-height:520px"><table class="dtable"><thead><tr><th>#</th><th>Codice</th><th>Descrizione</th><th>UM</th><th class="tr">Pr.Netto €/cassa</th><th class="tc">Pz/cassa</th><th class="tr">€/pz</th><th>IVA %</th><th></th></tr></thead><tbody id="prodBody"></tbody></table></div>
+  <div class="card-body" style="border-top:1px solid var(--border);padding:10px 18px"><span class="muted" style="font-size:11px">💡 Anagrafica aggiornata automaticamente ad ogni fattura importata (prezzo minimo storico). Il riferimento anomalie è il <strong>Listino Concordato</strong>.</span></div></div>
+</div>
+
+<!-- MODAL prodotto anagrafica -->
+<div class="modal-bg" id="prodModal"><div class="modal">
+  <h3>➕ Aggiungi/modifica prodotto anagrafica</h3>
+  <input type="hidden" id="mp_idx">
+  <div class="frow c2">
+    <div style="grid-column:1/-1"><label>Codice articolo</label><input id="mp_cod" placeholder="es. 006002"></div>
+    <div style="grid-column:1/-1"><label>Descrizione *</label><input id="mp_desc" placeholder="es. COCA COLA LATTINA CL.33"></div>
+    <div><label>UM</label><select id="mp_um"><option>CAR</option><option>PZ</option><option>CT</option><option>LT</option></select></div>
+    <div><label>Prezzo netto €</label><input id="mp_price" type="number" step="0.001" placeholder="0.000"></div>
+    <div><label>IVA %</label><select id="mp_iva"><option value="22">22</option><option value="10">10</option><option value="4">4</option></select></div>
+  </div>
+  <div class="modal-foot"><button class="btn btn-ghost" onclick="closeProdModal()">Annulla</button><button class="btn btn-amber" onclick="saveProd()">Salva</button></div>
+</div></div>
+
+<!-- MODAL listino concordato -->
+<div class="modal-bg" id="lcModal"><div class="modal">
+  <h3>📋 Aggiungi prodotto al Listino Concordato</h3>
+  <input type="hidden" id="lc_idx">
+  <div class="frow c2">
+    <div style="grid-column:1/-1"><label>Codice articolo</label><input id="lc_cod" placeholder="es. 006002"></div>
+    <div style="grid-column:1/-1"><label>Descrizione *</label><input id="lc_desc" placeholder="es. COCA COLA LATTINA CL.33 CAR 24"></div>
+    <div><label>UM</label><select id="lc_um"><option>CAR</option><option>PZ</option><option>CT</option><option>LT</option></select></div>
+    <div><label>Prezzo netto concordato €</label><input id="lc_price" type="number" step="0.001" placeholder="0.000"></div>
+    <div><label>IVA %</label><select id="lc_iva"><option value="22">22</option><option value="10">10</option><option value="4">4</option></select></div>
+  </div>
+  <div class="modal-foot"><button class="btn btn-ghost" onclick="closeLCModal()">Annulla</button><button class="btn btn-amber" onclick="saveLC()">Aggiungi al listino</button></div>
+</div></div>
+
+<script>
+// ============================================================
+// PDF.js setup
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// ============================================================
+// DATABASE — Supabase + localStorage fallback
+const SUPABASE_URL = 'https://fkivfnpmwvponqbwxoad.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZraXZmbnBtd3Zwb25xYnd4b2FkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5NTY2MTUsImV4cCI6MjA4NzUzMjYxNX0.vh4frux2aAtC0sT18NZoE1Lh8dMJa9FQ7oXNUwpu-B8';
+const SB = (path, opts={}) => fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+  ...opts,
+  headers: {'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json','Prefer':opts.prefer||'return=representation',...(opts.headers||{})}
+});
+
+const DB_KEY = 'tismasho_giemme_db';
+const DB_DEFAULT = {
+  orders: [],
+  anomalies: [],
+  verifications: [
+    "✅ Prezzi netti calcolati automaticamente applicando tutti gli sconti a cascata dal listino.",
+    "✅ Righe SC.MERCE (omaggi) identificate e escluse dal totale imponibile.",
+    "✅ Trasporto rilevato separatamente e aggiunto al totale fattura."
+  ],
+  note_credito: [],
+  listino_concordato: [],
+  products: []
+};
+
+let DB = loadDB();
+let currentParsed = null;
+let multiQueue = [];
+
+function loadDB(){
+  try{
+    const s=localStorage.getItem(DB_KEY);
+    if(s){
+      const d=JSON.parse(s);
+      if(d.orders){
+        if(!d.listino_concordato) d.listino_concordato=[];
+        if(!d.products) d.products=[];
+        return d;
+      }
+    }
+  }catch(e){}
+  return JSON.parse(JSON.stringify(DB_DEFAULT));
+}
+function saveDBLocal(){try{localStorage.setItem(DB_KEY,JSON.stringify(DB));}catch(e){}}
+
+// ============================================================
+// SUPABASE SYNC
+
+async function sbLoadAll(){
+  try{
+    const [ordR,prodR,lcR] = await Promise.all([
+      SB('gb_orders?select=*&order=data.asc').then(r=>r.json()),
+      SB('gb_products?select=*&order=id.asc').then(r=>r.json()),
+      SB('gb_listino_concordato?select=*&order=id.asc').then(r=>r.json())
+    ]);
+    if(Array.isArray(ordR)&&ordR.length>0){
+      const localOrders=DB.orders||[];
+      // Merge: parti dagli ordini locali, aggiorna/aggiungi quelli da Supabase
+      const merged={};
+      // Prima metti tutti i locali
+      for(const o of localOrders) merged[String(o.id)]=o;
+      // Poi sovrascrivi/aggiungi con quelli Supabase (più aggiornati), preservando omaggi locali
+      for(const o of ordR){
+        const parsed={...o,trasp:Number(o.trasp||0),
+          lines:typeof o.lines==='string'?JSON.parse(o.lines):(o.lines||[]),
+          omaggi:typeof o.omaggi==='string'?JSON.parse(o.omaggi):(o.omaggi||[])};
+        // Preserva omaggi locali se Supabase non li ha
+        if(parsed.omaggi.length===0){
+          const loc=merged[String(o.id)];
+          if(loc&&(loc.omaggi||[]).length>0) parsed.omaggi=loc.omaggi;
+        }
+        merged[String(o.id)]=parsed;
+      }
+      DB.orders=Object.values(merged).sort((a,b)=>{
+        const da=(a.data||'').split('/').reverse().join('');
+        const db=(b.data||'').split('/').reverse().join('');
+        return db.localeCompare(da);
+      });
+      if(Array.isArray(prodR)&&prodR.length>0)
+        DB.products=prodR.map(p=>({cod:p.cod,desc:p.descr,um:p.um,price:Number(p.price),iva:p.iva,pzCassa:p.pz_cassa||null,updated:p.updated||''}));
+      if(Array.isArray(lcR)&&lcR.length>0)
+        DB.listino_concordato=lcR.map(p=>({cod:p.cod,desc:p.descr,um:p.um,price:Number(p.price),iva:p.iva,pzCassa:p.pz_cassa||null}));
+      saveDBLocal();
+      refreshAll();renderProds();renderCredito();renderListinoConcordato();
+      showStatus(`✅ ${DB.orders.length} ordini caricati`,'ok');
+    } else if(Array.isArray(ordR)&&ordR.length===0){
+      showStatus('☁️ Database Supabase vuoto — uso dati locali','info');
+    }
+  }catch(e){
+    console.warn('Supabase load failed',e);
+    showStatus('⚠️ Offline — uso dati locali','warn');
+  }
+}
+
+async function sbSaveOrder(ord){
+  try{
+    const row={id:ord.id,store:ord.store,data:ord.data,num_fattura:ord.num_fattura||'',imp:ord.imp,iva_v:ord.iva_v,tot:ord.tot,trasp:ord.trasp||0,source:ord.source||'pdf',lines:JSON.stringify(ord.lines||[]),omaggi:JSON.stringify(ord.omaggi||[])};
+    await SB('gb_orders',{method:'POST',body:JSON.stringify(row),headers:{'Prefer':'return=representation,resolution=merge-duplicates'}});
+  }catch(e){console.warn('sbSaveOrder failed',e);}
+}
+
+async function sbSaveProduct(prod){
+  try{
+    const row={cod:prod.cod,descr:prod.desc,um:prod.um,price:prod.price,iva:prod.iva,pz_cassa:prod.pzCassa||null,updated:prod.updated||''};
+    const existing=await SB(`gb_products?cod=eq.${encodeURIComponent(prod.cod)}&select=id`).then(r=>r.json());
+    if(Array.isArray(existing)&&existing.length>0){
+      await SB(`gb_products?id=eq.${existing[0].id}`,{method:'PATCH',body:JSON.stringify(row)});
+    } else {
+      await SB('gb_products',{method:'POST',body:JSON.stringify(row)});
+    }
+  }catch(e){console.warn('sbSaveProduct failed',e);}
+}
+
+async function sbSaveLC(prod){
+  try{
+    const row={cod:prod.cod||'',descr:prod.desc,um:prod.um,price:prod.price,iva:prod.iva,pz_cassa:prod.pzCassa||null};
+    const existing=await SB(`gb_listino_concordato?cod=eq.${encodeURIComponent(prod.cod||prod.desc)}&select=id`).then(r=>r.json());
+    if(Array.isArray(existing)&&existing.length>0){
+      await SB(`gb_listino_concordato?id=eq.${existing[0].id}`,{method:'PATCH',body:JSON.stringify(row)});
+    } else {
+      await SB('gb_listino_concordato',{method:'POST',body:JSON.stringify(row)});
+    }
+  }catch(e){console.warn('sbSaveLC failed',e);}
+}
+
+async function sbDeleteOrder(id){
+  try{
+    await SB(`gb_orders?id=eq.${encodeURIComponent(id)}`,{method:'DELETE'});
+  }catch(e){console.warn('sbDeleteOrder failed',e);}
+}
+
+async function sbSyncAll(){
+  showStatus('☁️ Salvataggio su Supabase...','info');
+  try{
+    const BATCH=20;
+    let saved=0;
+    for(let i=0;i<DB.orders.length;i+=BATCH){
+      const batch=DB.orders.slice(i,i+BATCH).map(o=>({
+        id:o.id,store:o.store,data:o.data,num_fattura:o.num_fattura||'',
+        imp:o.imp,iva_v:o.iva_v,tot:o.tot,trasp:o.trasp||0,
+        source:o.source||'pdf',
+        lines:JSON.stringify(o.lines||[]),
+        omaggi:JSON.stringify(o.omaggi||[])
+      }));
+      const resp=await SB('gb_orders',{method:'POST',body:JSON.stringify(batch),headers:{'Prefer':'resolution=merge-duplicates,return=minimal'}});
+      if(!resp.ok){
+        const errText=await resp.text();
+        console.warn(`Batch ${i}-${i+BATCH} failed:`,resp.status,errText);
+        // Prova uno per uno come fallback
+        for(const o of DB.orders.slice(i,i+BATCH)){
+          try{ await sbSaveOrder(o); saved++; }catch(e2){ console.warn('Single save failed',o.id,e2); }
+        }
+      } else { saved+=batch.length; }
+    }
+    for(const p of DB.products) await sbSaveProduct(p);
+    for(const p of DB.listino_concordato) await sbSaveLC(p);
+    showStatus(`✅ Salvati ${saved}/${DB.orders.length} ordini su Supabase`,'ok');
+  }catch(e){
+    console.warn('sbSyncAll failed',e);
+    showStatus('⚠️ Errore Supabase — salvato localmente','warn');
+  }
+}
+function showStatus(msg,type){
+  const el=document.getElementById('syncStatus');
+  if(!el) return;
+  el.textContent=msg;
+  el.style.display='inline-block';
+  el.style.color=type==='ok'?'#a5d6a7':type==='warn'?'#ffe082':'#b3e5fc';
+  setTimeout(()=>{el.style.display='none'},4000);
+}
+
+function saveDB(){
+  saveDBLocal();
+  sbSyncAll();
+}
+
+// ============================================================
+// HELPERS
+const fmt=(n,d=2)=>n!=null?Number(n).toLocaleString('it-IT',{minimumFractionDigits:d,maximumFractionDigits:d}):'—';
+const fmt3=n=>n!=null?Number(n).toLocaleString('it-IT',{minimumFractionDigits:3,maximumFractionDigits:3}):'—';
+function storePill(s){
+  const m={TRASTEVERE:'pTRASTEVERE','PIAZZA ISTRIA':'pPIAZZA','PONTE MILVIO':'pPONTE',TUSCOLANA:'pTUSCOLANA'};
+  return `<span class="pill ${m[s]||''}">${s}</span>`;
+}
+
+function certBadge(cert){
+  if(!cert) return '<span class="abadge a-warn">⚠️ —</span>';
+  if(cert.includes('CERTA')) return `<span class="abadge a-certa">${cert}</span>`;
+  return `<span class="abadge a-warn">${cert}</span>`;
+}
+
+// ============================================================
+// PDF PARSER — GIEMME BEVANDE
+// Format: CODICE DESCRIZIONE UM QTÀ PREZZO [SC1 SC2 SC3] IMPORTO IVA%
+// SC.MERCE = riga omaggio (no importo)
+async function processPDF(file){
+  setStep(1,'active');setStep(2,'');setStep(3,'');
+  document.getElementById('step1Block').style.display='block';
+  document.getElementById('step2Block').style.display='none';
+  document.getElementById('step3Block').style.display='none';
+
+  const dz=document.getElementById('dz');
+  dz.className='dropzone';
+  const progWrap=document.getElementById('progWrap');
+  progWrap.style.display='block';
+  setProgress(10,'Caricamento PDF...');
+
+  const arrayBuffer=await file.arrayBuffer();
+  const pdf=await pdfjsLib.getDocument({data:arrayBuffer}).promise;
+  setProgress(30,'Estrazione testo...');
+
+  let fullText='';
+  for(let i=1;i<=pdf.numPages;i++){
+    const page=await pdf.getPage(i);
+    const content=await page.getTextContent();
+    const pageText=content.items.map(it=>it.str).join(' ');
+    fullText+=pageText+'\n';
+  }
+
+  document.getElementById('debugText').value=fullText;
+  setProgress(60,'Parsing dati...');
+
+  try{
+    const parsed=parseGiemmePDF(fullText);
+    currentParsed=parsed;
+    renderPreview(parsed);
+    setProgress(100,'✅ Completato!');
+    dz.className='dropzone success';
+    setStep(1,'done');setStep(2,'active');
+    document.getElementById('step1Block').style.display='none';
+    document.getElementById('step2Block').style.display='block';
+    runAnomalyCheck(parsed);
+  }catch(err){
+    setProgress(0,'');
+    dz.className='dropzone error';
+    document.getElementById('parseError').innerHTML=`<div class="alert alert-err">❌ Errore parsing: ${err.message} — <button class="btn btn-ghost btn-sm" onclick="document.getElementById('debugPanel').style.display='block'">🔍 Mostra testo grezzo</button></div>`;
+  }
+}
+
+function pn(s){return parseFloat((s||'').replace(',','.'))||0;}
+
+// ============================================================
+// PEZZATURA — estrae quante unità ci sono per cassa e calcola il prezzo unitario
+// Mappa descrizioni normalizzate (per titoli corretti + pz/cassa noti)
+const GIEMME_PRODOTTI = [
+  {cod:'001014', desc:'ACQUA SORGESANA NATURALE L.1.50 PET',          pz:6},
+  {cod:'001143', desc:'ACQUA EGERIA EFFERVESCENTE LT.0.500 PET X24',  pz:24},
+  {cod:'001177', desc:'ACQUA SORGESANA NATURALE L.0.50 PET',           pz:24},
+  {cod:'004575', desc:'FUSTO BIRRA BULLDOG STRONG LAGER LT.20 TAP VERDE', pz:1},
+  {cod:'005065', desc:'FUSTO BIRRA HEINEKEN L.30',                     pz:1},
+  {pattern:/SORGESANA.*NAT.*1[,\.]5/i,   desc:'ACQUA SORGESANA NATURALE L.1.50 PET',       pz:6},
+  {pattern:/SORGESANA.*0[,\.]?50?\s*PET/i, desc:'ACQUA SORGESANA NATURALE L.0.50 PET',     pz:24},
+  {pattern:/EGERIA.*EFF|EFFERVESCENTE.*EGERIA/i, desc:'ACQUA EGERIA EFFERVESCENTE LT.0.500 PET X24', pz:24},
+  {pattern:/BULLDOG|STONG\s*LAG/i,       desc:'FUSTO BIRRA BULLDOG STRONG LAGER LT.20 TAP VERDE', pz:1},
+  {pattern:/HEINEKEN.*L\.?30|FUSTO.*HEINEKEN/i, desc:'FUSTO BIRRA HEINEKEN L.30',          pz:1},
+  {pattern:/COCA.*ZERO.*PET.*0[,\.]?4/i, desc:'COCA COLA ZERO PET L.0.450 X 12',           pz:12},
+  {pattern:/FUZE.*PESCA/i,               desc:'THE FUZE PESCA ROSE L.0.400',               pz:12},
+  {pattern:/FUZE.*LEMON/i,               desc:'THE FUZE LEMONGRASS L.0.400',               pz:12},
+];
+
+function normalizzaDesc(desc, cod){
+  for(const r of GIEMME_PRODOTTI){
+    if(r.cod && cod && r.cod===cod) return {desc:r.desc, pz:r.pz};
+    if(r.pattern && r.pattern.test(desc)) return {desc:r.desc, pz:r.pz};
+  }
+  return null;
+}
+
+function estraiPezzatura(desc, cod){
+  if(!desc) return null;
+  // 0) Lookup per codice articolo o pattern
+  const known = normalizzaDesc(desc, cod);
+  if(known) return {pz:known.pz, fonte:'tabella prodotti'};
+  // 1) Pattern esplicito: x24, X12, X 24, x 12, CL.33 X 24 etc.
+  const xm=desc.match(/[Xx]\s*(\d{1,3})\b/);
+  if(xm) return {pz:parseInt(xm[1]),fonte:'esplicito'};
+  // 2) Volume → pezzatura standard
+  // 1.5L o 1.50L → 6 pz
+  const v15=desc.match(/L\.?\s*0?1[,\.]?5/i);
+  if(v15) return {pz:6,fonte:'1.5L×6'};
+  // 2L → 6 pz
+  const v2=desc.match(/L\.?\s*0?2[,\.]?0?\b/i);
+  if(v2) return {pz:6,fonte:'2L×6'};
+  // 0.5L / 0.50L / 0.500L → 24 pz
+  const v05=desc.match(/L\.?\s*0?[,\.]?5/i);
+  if(v05) return {pz:24,fonte:'0.5L×24'};
+  // CL.33 / CL.0,33 → lattina 33cl → 24 pz
+  const vcl=desc.match(/CL\.?\s*0?[,\.]?\s*(33|0,33|0\.33)/i);
+  if(vcl) return {pz:24,fonte:'lattina 33cl×24'};
+  // LATTINA senza CL → presumi 24
+  if(/LATTINA|LATT\b/i.test(desc)) return {pz:24,fonte:'lattina std×24'};
+  return null;
+}
+
+// ============================================================
+// PARSER CORE — testato su fattura reale Giemme (14/14 articoli ✅)
+function parseGiemmeLines(text){
+  const items=[];
+  const flat=text.replace(/\r?\n/g,' ').replace(/\s{2,}/g,' ');
+  const startIdx=flat.search(/CODICE ARTICOLO/i);
+  const endIdx=flat.search(/TOTALE MERCE/i);
+  const zone=(startIdx>=0&&endIdx>startIdx)?flat.slice(startIdx,endIdx):flat;
+  // Splitta in blocchi per codice a 6 cifre
+  const parts=zone.split(/(?=\b\d{6}\b)/).filter(b=>/^\d{6}/.test(b.trim()));
+
+  for(const block of parts){
+    const b=block.trim();
+    const cod=b.slice(0,6);
+    const rest=b.slice(6).trim();
+
+    // UM
+    const umMatch=rest.match(/\b(CAR|PZ|LT|CT|BOT|FUS|KG)\b/);
+    if(!umMatch) continue;
+    const um=umMatch[1];
+    const umIdx=rest.indexOf(umMatch[0]);
+    const desc=rest.slice(0,umIdx).trim().replace(/\s+/g,' ');
+    const afterUM=rest.slice(umIdx+um.length).trim();
+
+    // Omaggio con SC.MERCE (prima di leggere numeri)
+    if(/SC\.MERCE/i.test(afterUM)){
+      const seqM=afterUM.match(/\b(\d{1,3})\s+(\d+[,\.]\d+)/);
+      items.push({cod,desc,um,qta:seqM?pn(seqM[1]):0,prezzoListino:seqM?pn(seqM[2]):0,sconti:[],prezzoNetto:0,iva:22,importo:0,omaggio:true});
+      continue;
+    }
+
+    // Trova QTÀ + PREZZO LISTINO: primo intero (1-99) seguito da d,ddd (3 decimali)
+    const seqMatch=afterUM.match(/\b(\d{1,3})\s+(\d{1,3}[,\.]\d{3})\b/);
+    if(!seqMatch) continue;
+    const qta=pn(seqMatch[1]);
+    const prezzoListino=pn(seqMatch[2]);
+    const seqStart=afterUM.indexOf(seqMatch[0]);
+    const tail=afterUM.slice(seqStart+seqMatch[0].length).trim();
+
+    // Omaggio nel tail (dopo aver trovato qtà+prezzo)
+    if(/SC\.MERCE/i.test(tail)){
+      items.push({cod,desc,um,qta,prezzoListino,sconti:[],prezzoNetto:0,iva:22,importo:0,omaggio:true});
+      continue;
+    }
+
+    // Tokenizza il tail: possono esserci numeri spurii dopo l'IVA (frammenti riga successiva)
+    const tokenRe=/-?\d+[,\.]\d+|-?\d+/g;
+    const tokens=[];
+    let tm;
+    while((tm=tokenRe.exec(tail))!==null) tokens.push(pn(tm[0]));
+    if(tokens.length<1) continue;
+
+    // Trova IVA: primo 22/10/4 partendo dalla fine (ignora spazzatura successiva)
+    let ivaIdx=-1;
+    for(let k=tokens.length-1;k>=0;k--){
+      if(tokens[k]===22||tokens[k]===10||tokens[k]===4){ivaIdx=k;break;}
+    }
+
+    let iva=22,importo=0,sconti=[];
+    if(ivaIdx>=0){
+      iva=tokens[ivaIdx];
+      // Importo = primo numero positivo prima dell'IVA
+      for(let k=ivaIdx-1;k>=0;k--){if(tokens[k]>0){importo=tokens[k];break;}}
+      // Sconti = negativi tra index 0 e ivaIdx
+      sconti=tokens.slice(0,ivaIdx).filter(n=>n<0);
+    } else {
+      // Nessuna IVA — prendi l'ultimo positivo come importo
+      importo=Math.abs(tokens[tokens.length-1]);
+      sconti=tokens.slice(0,tokens.length-1).filter(n=>n<0);
+    }
+
+    // Prezzo netto: cascata sconti
+    let prezzoNetto=prezzoListino;
+    for(const sc of sconti) prezzoNetto=prezzoNetto*(1-Math.abs(sc)/100);
+    prezzoNetto=Math.round(prezzoNetto*1000)/1000;
+    // Cross-check con importo fattura
+    if(Math.abs(Math.round(qta*prezzoNetto*100)/100-importo)>0.05&&qta>0) prezzoNetto=Math.round((importo/qta)*1000)/1000;
+    const finalImporto=Math.round(qta*prezzoNetto*100)/100;
+
+    const pezz=estraiPezzatura(desc, cod);
+    const norm=normalizzaDesc(desc, cod);
+    const finalDesc=norm?norm.desc:desc;
+    const pzCassa=pezz?pezz.pz:null;
+    const prezzoUnitario=pzCassa&&prezzoNetto>0?Math.round(prezzoNetto/pzCassa*1000)/1000:null;
+    items.push({cod,desc:finalDesc,um,qta,prezzoListino,sconti,prezzoNetto,pzCassa,prezzoUnitario,fontePz:pezz?pezz.fonte:null,iva,importo:finalImporto,omaggio:false});
+  }
+  return items;
+}
+
+function parseGiemmePDF(text){
+  const p={};
+
+  // ---- Numero fattura e data documento ----
+  // Pattern: " 58 05/01/2026" (numero con spazi davanti, poi data)
+  const numMatch=text.match(/\b(\d{2,6})\s+(\d{2}\/\d{2}\/\d{4})/);
+  if(numMatch){p.numFattura=numMatch[1].trim();p.dataFattura=numMatch[2];}
+
+  // ---- Store ----
+  p.store='';
+  const storePatterns=[
+    {r:/ponte\s+milvio/i,v:'PONTE MILVIO'},
+    {r:/trastevere/i,v:'TRASTEVERE'},
+    {r:/piazza\s+istria/i,v:'PIAZZA ISTRIA'},
+    {r:/tuscolana/i,v:'TUSCOLANA'}
+  ];
+  for(const sp of storePatterns){if(sp.r.test(text)){p.store=sp.v;break;}}
+
+  // ---- Rif. ordine ----
+  const rifMatch=text.match(/Rif\.\s*ordine\s+(\d+)\s+del\s+(\d{2}\/\d{2}\/\d{4})/i);
+  p.rifOrdine=rifMatch?`${rifMatch[1]} del ${rifMatch[2]}`:'';
+
+  // ---- Pagamento ----
+  const pagMatch=text.match(/PAGAMENTO\s+(RIM[\w\.\s]+?)(?:BANCA|\n|$)/i);
+  p.pagamento=pagMatch?pagMatch[1].trim():'RIM.DIR. FINE MESE';
+
+  // ---- Scadenza (prima data dopo "SCADENZA E IMPORTO 1^") ----
+  const scadMatch=text.match(/SCADENZA E IMPORTO 1\^ RATA\s+(\d{2}\/\d{2}\/\d{4})/i);
+  p.scadenza=scadMatch?scadMatch[1]:(p.dataFattura||'');
+
+  // ---- Trasporto ----
+  const traspMatch=text.match(/TRASPORTO\s+([\d]+[,\.][\d]+)/i);
+  p.trasporto=traspMatch?pn(traspMatch[1]):1.00;
+
+  // ---- Totale netto a pagare ----
+  const totMatch=text.match(/NETTO A PAGARE(?:\s+EURO)?\s+([\d\.]+[,]\d+)/i);
+  p.totFattura=totMatch?pn(totMatch[1]):0;
+
+  // ---- Parse righe articolo ----
+  p.items=parseGiemmeLines(text);
+
+  // ---- Calcoli ----
+  const normali=p.items.filter(i=>!i.omaggio);
+  p.totImp=normali.reduce((s,i)=>s+i.importo,0);
+  p.totIva=normali.reduce((s,i)=>s+i.importo*(i.iva/100),0);
+  p.omaggi=p.items.filter(i=>i.omaggio);
+
+  return p;
+}
+
+// ============================================================
+// RENDER PREVIEW
+function renderPreview(p){
+  document.getElementById('prev_num').value=p.numFattura||'';
+  document.getElementById('prev_store').value=p.store||'PONTE MILVIO';
+  document.getElementById('prev_data').value=p.dataFattura||'';
+  document.getElementById('prev_cons').value=p.scadenza||'';
+  document.getElementById('prev_op').value=p.rifOrdine||'';
+  document.getElementById('prev_pag').value=p.pagamento||'';
+  document.getElementById('prev_trasp').value=p.trasporto||'';
+
+  const tbody=document.getElementById('prevRows');
+  tbody.innerHTML='';
+  (p.items||[]).forEach((it,idx)=>{
+    const sc=it.sconti&&it.sconti.length>0?it.sconti.map(s=>`${s>0?'+':''}${s}%`).join(' '):'—';
+    const cls=it.omaggio?'omaggio-row':'';
+    const pzBadge=it.pzCassa
+      ?`<span title="${it.fontePz||''}" style="background:#e3f2fd;color:#0d47a1;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;cursor:help">${it.pzCassa}pz</span>`
+      :`<span style="background:#f5f5f5;color:#999;padding:2px 7px;border-radius:4px;font-size:10px">—</span>`;
+    const unitBadge=it.prezzoUnitario
+      ?`<span style="background:#e8f5e9;color:#1b5e20;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:700;font-family:var(--mono)">€${fmt3(it.prezzoUnitario)}</span>`
+      :'<span style="color:#ccc">—</span>';
+    tbody.innerHTML+=`<tr class="${cls}" data-idx="${idx}">
+      <td class="muted">${idx+1}</td>
+      <td><input value="${it.cod||''}" style="width:70px" onchange="updateItem(${idx},'cod',this.value)"></td>
+      <td><input value="${it.desc||''}" style="min-width:200px" onchange="updateItem(${idx},'desc',this.value)"></td>
+      <td><input value="${it.um||'CAR'}" style="width:40px" onchange="updateItem(${idx},'um',this.value)"></td>
+      <td><input type="number" value="${it.qta||0}" style="width:55px" onchange="updateItem(${idx},'qta',+this.value)"></td>
+      <td class="tr mono">${fmt3(it.prezzoListino)}</td>
+      <td class="sconti-chain">${sc}</td>
+      <td><input type="number" value="${it.prezzoNetto||0}" step="0.001" style="width:75px" onchange="updateItem(${idx},'prezzoNetto',+this.value)"></td>
+      <td class="tc">${pzBadge}</td>
+      <td class="tc">${unitBadge}</td>
+      <td><input type="number" value="${it.iva||22}" style="width:42px" onchange="updateItem(${idx},'iva',+this.value)"></td>
+      <td class="tr fb mono">${it.omaggio?'<span class="sc-merce">OMAGGIO</span>':('€ '+fmt(it.importo))}</td>
+      <td class="tc">${it.omaggio?'<span class="sc-merce">✓</span>':'—'}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="removeItem(${idx})">✕</button></td>
+    </tr>`;
+  });
+  updateTotals();
+}
+
+function updateItem(idx,field,val){
+  if(!currentParsed||!currentParsed.items[idx]) return;
+  currentParsed.items[idx][field]=val;
+  if(field==='prezzoNetto'||field==='qta'){
+    const it=currentParsed.items[idx];
+    if(!it.omaggio) it.importo=Math.round(it.qta*it.prezzoNetto*100)/100;
+  }
+  updateTotals();
+}
+function removeItem(idx){currentParsed.items.splice(idx,1);renderPreview(currentParsed);}
+function addPrevRow(){
+  currentParsed.items.push({cod:'',desc:'Nuovo prodotto',um:'CAR',qta:1,prezzoListino:0,sconti:[],prezzoNetto:0,iva:22,importo:0,omaggio:false});
+  renderPreview(currentParsed);
+}
+function updateTotals(){
+  if(!currentParsed) return;
+  const rig=currentParsed.items.filter(i=>!i.omaggio);
+  const imp=rig.reduce((s,i)=>s+i.importo,0);
+  const trasp=parseFloat(document.getElementById('prev_trasp').value)||0;
+  const iva=rig.reduce((s,i)=>s+i.importo*(i.iva/100),0);
+  const tot=imp+trasp+iva;
+  document.getElementById('prevTotImp').textContent='€ '+fmt(imp);
+  document.getElementById('prevTotals').innerHTML=`
+    <span style="margin-right:14px">Imponibile: <strong>€ ${fmt(imp)}</strong></span>
+    <span style="margin-right:14px">Trasporto: <strong>€ ${fmt(trasp)}</strong></span>
+    <span style="margin-right:14px">IVA: <strong>€ ${fmt(iva)}</strong></span>
+    <span style="color:var(--blue);font-weight:700;font-size:14px">Totale: € ${fmt(tot)}</span>
+    ${currentParsed.omaggi&&currentParsed.omaggi.length>0?`<span class="sc-merce" style="margin-left:10px">+ ${currentParsed.omaggi.length} omaggio/i</span>`:''}
+  `;
+}
+
+// ============================================================
+// ANOMALY CHECK
+function runAnomalyCheck(p){
+  const warns=[];
+  const existing=DB.orders.find(o=>String(o.id)===String(p.numFattura));
+  if(existing)
+    warns.push({type:'err',msg:`⚠️ Fattura <strong>${p.numFattura}</strong> già presente (${existing.store}, ${existing.data}, €${fmt(existing.tot)}).<br>Salvando <strong>sovrascriverai</strong> la fattura esistente.`});
+  if(!p.store) warns.push({type:'err',msg:'❌ Store non rilevato — selezionalo manualmente.'});
+  for(const item of p.items.filter(i=>!i.omaggio)){
+    const lc=(DB.listino_concordato||[]).find(pr=>pr.cod===item.cod||pr.desc===item.desc);
+    if(lc&&item.prezzoNetto&&Math.abs(item.prezzoNetto-lc.price)>0.005)
+      warns.push({type:'warn',msg:`⚠️ Prezzo diverso dal concordato: <strong>${item.desc.substring(0,50)}</strong> — Fattura: €${fmt3(item.prezzoNetto)} | Concordato: €${fmt3(lc.price)} (${item.prezzoNetto>lc.price?'+':''}€${(item.prezzoNetto-lc.price).toFixed(3)})`});
+  }
+  if(!p.dataFattura) warns.push({type:'warn',msg:'🟡 Data fattura non rilevata.'});
+  if(p.items.length===0) warns.push({type:'err',msg:'❌ Nessun articolo rilevato.'});
+  const el=document.getElementById('anomalyCheck');
+  if(warns.length===0) el.innerHTML=`<div class="alert alert-ok">✅ Nessuna anomalia — ${p.items.length} articoli (${p.items.filter(i=>i.omaggio).length} omaggi), totale €${fmt(p.items.filter(i=>!i.omaggio).reduce((s,i)=>s+i.importo,0))}</div>`;
+  else el.innerHTML=warns.map(w=>`<div class="alert ${w.type==='err'?'alert-err':'alert-warn'}">${w.msg}</div>`).join('');
+}
+
+// ============================================================
+// CONFIRM SAVE
+function confirmSave(){
+  const numFattura=document.getElementById('prev_num').value.trim();
+  const store=document.getElementById('prev_store').value;
+  const dataOrd=document.getElementById('prev_data').value;
+  const scad=document.getElementById('prev_cons').value||'N/D';
+  const rifOrd=document.getElementById('prev_op').value;
+  const pag=document.getElementById('prev_pag').value;
+  const trasp=parseFloat(document.getElementById('prev_trasp').value)||0;
+  if(!numFattura||!store||!dataOrd){document.getElementById('anomalyCheck').innerHTML=`<div class="alert alert-err">❌ Numero fattura, store e data obbligatori.</div>`;return;}
+
+  // Blocca duplicati (solo in modalità singola, non in multi che gestisce da sola)
+  if(multiQueue.length===0){
+    const dup=DB.orders.find(o=>String(o.id)===numFattura);
+    if(dup){
+      document.getElementById('anomalyCheck').innerHTML=`<div class="alert alert-err">⚠️ Fattura <strong>#${numFattura}</strong> già presente (${dup.store}, ${dup.data}, €${fmt(dup.tot)}). Non è stata sovrascritta.</div>`;
+      return;
+    }
+  }
+
+  const existIdx=DB.orders.findIndex(o=>String(o.id)===numFattura);
+  const p=currentParsed;
+  const lines=p.items.filter(i=>!i.omaggio);
+  const omaggiLines=p.items.filter(i=>i.omaggio);
+  const totImp=lines.reduce((s,i)=>s+i.importo,0);
+  const totIva=lines.reduce((s,i)=>s+i.importo*(i.iva/100),0);
+  const totDoc=totImp+trasp+totIva;
+
+  const newOrd={
+    id:numFattura,store,data:dataOrd,cons:scad,op:rifOrd||'N/D',
+    imp:Math.round(totImp*100)/100,
+    iva_v:Math.round(totIva*100)/100,
+    tot:Math.round(totDoc*100)/100,
+    trasp,pag,
+    lines:lines.map(l=>({cod:l.cod,desc:l.desc,um:l.um,qta:l.qta,prezzoListino:l.prezzoListino,sconti:l.sconti,prezzo:l.prezzoNetto,pzCassa:l.pzCassa||null,prezzoUnitario:l.prezzoUnitario||null,iva:l.iva,importo:l.importo})),
+    omaggi:omaggiLines.map(l=>({cod:l.cod,desc:l.desc,um:l.um,qta:l.qta})),
+    source:'pdf'
+  };
+
+  if(existIdx>=0) DB.orders[existIdx]=newOrd; else DB.orders.push(newOrd);
+
+  // Anomalie vs listino concordato
+  for(const item of lines){
+    const lc=(DB.listino_concordato||[]).find(pr=>pr.cod===item.cod||pr.desc===item.desc);
+    if(lc&&item.prezzoNetto&&Math.abs(item.prezzoNetto-lc.price)>0.005){
+      const diff=item.prezzoNetto-lc.price;
+      DB.anomalies.push({n:DB.anomalies.length+1,cat:'PREZZO',tipo:'Prezzo diverso dal listino concordato',cert:'🔴 CERTA',store,ordine:numFattura,det:`${item.desc}\nFattura €${fmt3(item.prezzoNetto)} vs concordato €${fmt3(lc.price)} (${diff>0?'+':''}€${diff.toFixed(3)})`});
+    }
+  }
+
+  // Anomalie vs fattura precedente (aumento prezzo)
+  for(const item of lines){
+    if(!item.prezzoNetto||item.prezzoNetto<=0) continue;
+    const prevOrders=DB.orders.filter(o=>o.id!==numFattura&&o.store===store&&(o.lines||[]).some(l=>l.cod===item.cod||(l.desc===item.desc)));
+    if(prevOrders.length>0){
+      const lastOrd=prevOrders[0]; // già ordinati per data desc
+      const lastLine=(lastOrd.lines||[]).find(l=>l.cod===item.cod||(l.desc===item.desc));
+      if(lastLine&&lastLine.prezzo&&item.prezzoNetto>lastLine.prezzo+0.005){
+        const diff=item.prezzoNetto-lastLine.prezzo;
+        DB.anomalies.push({n:DB.anomalies.length+1,cat:'AUMENTO',tipo:'Prezzo aumentato rispetto alla fattura precedente',cert:'🟡 ATTENZIONE',store,ordine:numFattura,det:`${item.desc}\nFattura ${numFattura}: €${fmt3(item.prezzoNetto)} vs fattura ${lastOrd.id}: €${fmt3(lastLine.prezzo)} (+€${diff.toFixed(3)})`});
+      }
+    }
+  }
+
+  // Aggiorna anagrafica (prezzo minimo storico)
+  for(const item of lines){
+    if(!item.desc||item.prezzoNetto<=0) continue;
+    const ex=DB.products.find(pr=>pr.desc===item.desc||(item.cod&&pr.cod===item.cod));
+    if(ex){if(item.prezzoNetto<ex.price){ex.price=item.prezzoNetto;ex.pzCassa=item.pzCassa||ex.pzCassa;ex.prezzoUnitario=item.pzCassa&&item.prezzoNetto?Math.round(item.prezzoNetto/item.pzCassa*1000)/1000:ex.prezzoUnitario;}}
+    else DB.products.push({cod:item.cod,desc:item.desc,um:item.um,price:item.prezzoNetto,iva:item.iva,pzCassa:item.pzCassa||null,prezzoUnitario:item.prezzoUnitario||null});
+  }
+
+  DB.orders.sort((a,b)=>{
+    const da=(a.data||'').split('/').reverse().join('');
+    const db=(b.data||'').split('/').reverse().join('');
+    return db.localeCompare(da);
+  });
+
+  refreshAll();
+  setStep(3,'active');setStep(2,'done');
+  document.getElementById('step2Block').style.display='none';
+  document.getElementById('step3Block').style.display='block';
+  const nAnoms=DB.anomalies.filter(a=>a.ordine===numFattura).length;
+  document.getElementById('saveConfirmMsg').innerHTML=`
+    <div class="alert alert-ok">✅ Fattura <strong>${numFattura}</strong> salvata — ${storePill(store)}
+    &nbsp;·&nbsp;${dataOrd} · scad. ${scad}&nbsp;·&nbsp;${rifOrd}
+    &nbsp;·&nbsp;<strong>${lines.length}</strong> art.&nbsp;·&nbsp;Totale: <strong>€ ${fmt(totDoc)}</strong>
+    ${omaggiLines.length>0?`<br><span class="sc-merce">+ ${omaggiLines.length} omaggio/i: ${omaggiLines.map(o=>o.desc).join(', ')}</span>`:''}
+    ${nAnoms>0?`<br><span class="abadge a-certa mt8">⚠️ ${nAnoms} anomalia/e prezzo</span>`:''}</div>`;
+  if(multiQueue.length>0) setTimeout(processNextInQueue,800);
+}
+
+function backToStep1(){
+  setStep(1,'active');setStep(2,'');setStep(3,'');
+  document.getElementById('step1Block').style.display='block';
+  document.getElementById('step2Block').style.display='none';
+  document.getElementById('step3Block').style.display='none';
+  currentParsed=null;
+}
+function setStep(n,cls){document.getElementById('st'+n).className='step'+(cls?' '+cls:'');}
+
+// Multi-file — auto-salva senza chiedere conferma
+async function loadMulti(e){multiQueue=[...e.target.files];e.target.value='';renderQueue();if(multiQueue.length>0) processNextInQueue();}
+async function processNextInQueue(){
+  if(multiQueue.length===0) return;
+  const file=multiQueue.shift();
+  renderQueue();
+  await processPDF(file);
+  // Auto-salva solo se il parsing è andato a buon fine e la fattura non è duplicata
+  if(currentParsed){
+    const numFattura=String(currentParsed.numFattura||'');
+    if(numFattura && DB.orders.find(o=>String(o.id)===numFattura)){
+      showStatus(`⚠️ Fattura #${numFattura} già presente — saltata`,'warn');
+      currentParsed=null;
+      if(multiQueue.length>0) setTimeout(processNextInQueue,600);
+      return;
+    }
+    confirmSave();
+  }
+}
+function renderQueue(){
+  const el=document.getElementById('multiQueue');
+  if(multiQueue.length===0){el.innerHTML='';return;}
+  el.innerHTML=`<div class="alert alert-info">📦 In coda: <strong>${multiQueue.length}</strong> PDF — ${multiQueue.map(f=>f.name).join(', ')}</div>`;
+}
+
+// ============================================================
+// DROP ZONE
+async function loadPDF(e){if(e.target.files[0]) await processPDF(e.target.files[0]);}
+function dzOver(e){e.preventDefault();document.getElementById('dz').className='dropzone drag';}
+function dzLeave(){document.getElementById('dz').className='dropzone';}
+async function dzDrop(e){e.preventDefault();document.getElementById('dz').className='dropzone';if(e.dataTransfer.files[0]) await processPDF(e.dataTransfer.files[0]);}
+function setProgress(pct,label){
+  document.getElementById('progFill').style.width=pct+'%';
+  if(label) document.getElementById('progLabel').textContent=label;
+}
+
+// ============================================================
+// TAB NAVIGATION
+function showTab(id){
+  const ids=['dashboard','carica','store','ordini','settimane','anomalie','omaggi','credito','listino_concordato','listino'];
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',ids[i]===id));
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  if(id==='store') renderStoreDetail();
+  if(id==='settimane') renderWeekly();
+  if(id==='listino') renderProds();
+  if(id==='credito') renderCredito();
+  if(id==='listino_concordato') renderListinoConcordato();
+}
+
+// ============================================================
+// DASHBOARD RENDER
+// Helper: tutte le anomalie inclusi scostamenti calcolati al volo
+function getAllAnomalies(){
+  function getWkKey(data){
+    const p=(data||'').split('/');
+    if(p.length!==3) return 'x';
+    const d=parseInt(p[0]);
+    return p[2]+'-'+p[1]+'-W'+(d<=7?1:d<=14?2:d<=21?3:4);
+  }
+  const byPW={};
+  for(const o of DB.orders){
+    const wk=getWkKey(o.data);
+    for(const l of (o.lines||[])){
+      const desc=(l.desc||l.descrizione||'');
+      const key=desc+'::'+wk;
+      if(!byPW[key]) byPW[key]={desc,wk,store:o.store,ordini:[],prezzi:[]};
+      byPW[key].ordini.push(o.id);
+      const pr=l.prezzoNetto||l.prezzo_netto||l.prezzo||0;
+      if(pr>0&&!byPW[key].prezzi.includes(pr)) byPW[key].prezzi.push(pr);
+    }
+  }
+  const MESI=['','Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+  const scost=[];
+  let n=DB.anomalies.length+1;
+  for(const entry of Object.values(byPW)){
+    if(entry.prezzi.length<2) continue;
+    const m=entry.wk.match(/(\d{4})-(\d{2})-W(\d)/);
+    const wkLabel=m?(MESI[parseInt(m[2])]+' '+m[1]+' — Settimana '+m[3]):entry.wk;
+    scost.push({n:n++,cat:'SCOSTAMENTO',tipo:'Prezzi diversi nella stessa settimana',cert:'🟡 DA VERIFICARE',
+      store:entry.store,ordine:[...new Set(entry.ordini)].join(', '),
+      det:entry.desc+'\n'+wkLabel+'\nPrezzi rilevati: '+entry.prezzi.map(x=>'€'+x.toFixed(3)).join(' / ')+' | Scostamento: €'+(Math.max(...entry.prezzi)-Math.min(...entry.prezzi)).toFixed(3)});
+  }
+  return [...DB.anomalies,...scost];
+}
+
+function populateMonthSelector(){
+  const sel=document.getElementById('monthSel');
+  if(!sel) return;
+  const months=new Set();
+  for(const o of DB.orders){
+    const p=(o.data||'').split('/');
+    if(p.length===3) months.add(p[2]+'-'+p[1]);
+  }
+  const sorted=[...months].sort().reverse();
+  const MESI=['','Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+  const cur=sel.value;
+  sel.innerHTML='<option value="">Tutti i mesi</option>'+sorted.map(m=>{
+    const [y,mo]=m.split('-');
+    return '<option value="'+m+'"'+(m===cur?' selected':'')+'>'+MESI[parseInt(mo)]+' '+y+'</option>';
+  }).join('');
+}
+
+function renderDashboard(){
+  const totOrd=DB.orders.length;
+  const totLines=DB.orders.reduce((s,o)=>s+(o.lines||[]).length,0);
+  const totImp=DB.orders.reduce((s,o)=>s+(o.imp||0),0);
+  const totIva=DB.orders.reduce((s,o)=>s+(o.iva_v||0),0);
+  const totTot=DB.orders.reduce((s,o)=>s+(o.tot||0),0);
+  const pdfCount=DB.orders.filter(o=>o.source==='pdf').length;
+  const omaggiTot=DB.orders.reduce((s,o)=>s+(o.omaggi||[]).length,0);
+
+  document.getElementById('statsGrid').innerHTML=`
+    <div class="stat"><div class="stat-lbl">Fatture totali</div><div class="stat-val">${totOrd}</div><div class="stat-sub">4 store · ${pdfCount} da PDF</div></div>
+    <div class="stat b"><div class="stat-lbl">Righe prodotto</div><div class="stat-val">${totLines}</div><div class="stat-sub">media ${totOrd>0?(totLines/totOrd).toFixed(1):0}/fattura</div></div>
+    <div class="stat d"><div class="stat-lbl">Imponibile totale</div><div class="stat-val" style="font-size:18px">€ ${fmt(totImp)}</div><div class="stat-sub">IVA: €${fmt(totIva)}</div></div>
+    <div class="stat"><div class="stat-lbl">Totale fatturato</div><div class="stat-val" style="font-size:18px">€ ${fmt(totTot)}</div><div class="stat-sub">incl. trasporti</div></div>
+    <div class="stat g"><div class="stat-lbl">Omaggi ricevuti</div><div class="stat-val">${omaggiTot}</div><div class="stat-sub">righe SC.MERCE</div></div>
+  `;
+
+  // Spese trasporto per store
+  const stores=['TRASTEVERE','PIAZZA ISTRIA','PONTE MILVIO','TUSCOLANA'];
+  let traspRows='',totTrFat=0,totTrEur=0;
+  for(const st of stores){
+    const ords=DB.orders.filter(o=>o.store===st&&(o.trasp||0)>0);
+    const tot=ords.reduce((s,o)=>s+(o.trasp||0),0);
+    const media=ords.length>0?tot/ords.length:0;
+    totTrFat+=ords.length;totTrEur+=tot;
+    traspRows+=`<tr><td>${storePill(st)}</td><td class="tc">${ords.length}</td><td class="tr mono">€ ${fmt(tot)}</td><td class="tr mono">${ords.length>0?'€ '+fmt(media):'—'}</td></tr>`;
+  }
+  document.getElementById('traspBody').innerHTML=traspRows;
+  document.getElementById('traspFoot').innerHTML=`<tr><td class="fb">TOTALE</td><td class="tc fb">${totTrFat}</td><td class="tr mono fb">€ ${fmt(totTrEur)}</td><td class="tr mono">${totTrFat>0?'€ '+fmt(totTrEur/totTrFat):'—'}</td></tr>`;
+
+  // Riepilogo store
+  const storesSummary=['TRASTEVERE','PIAZZA ISTRIA','PONTE MILVIO','TUSCOLANA'];
+  let rows='',totImpS=0,totIvaS=0,totTotS=0,totOrdS=0;
+  for(const st of storesSummary){
+    const ords=DB.orders.filter(o=>o.store===st);
+    const imp=ords.reduce((s,o)=>s+(o.imp||0),0);
+    const iva=ords.reduce((s,o)=>s+(o.iva_v||0),0);
+    const tot=ords.reduce((s,o)=>s+(o.tot||0),0);
+    const pct=totTot>0?(tot/totTot*100).toFixed(1):'—';
+    totImpS+=imp;totIvaS+=iva;totTotS+=tot;totOrdS+=ords.length;
+    rows+=`<tr><td>${storePill(st)}</td><td class="tc">${ords.length}</td><td class="tr mono">€ ${fmt(imp)}</td><td class="tr mono">€ ${fmt(iva)}</td><td class="tr mono fb">€ ${fmt(tot)}</td><td class="tr muted">${pct}%</td></tr>`;
+  }
+  document.getElementById('riepilogoBody').innerHTML=rows;
+  document.getElementById('riepilogoFoot').innerHTML=`<tr><td class="fb">TOTALE</td><td class="tc fb">${totOrdS}</td><td class="tr mono fb">€ ${fmt(totImpS)}</td><td class="tr mono fb">€ ${fmt(totIvaS)}</td><td class="tr mono fb">€ ${fmt(totTotS)}</td><td></td></tr>`;
+
+  // Last orders
+  const last=[...DB.orders].sort((a,b)=>new Date(b.data.split('/').reverse().join('-'))-new Date(a.data.split('/').reverse().join('-'))).slice(0,10);
+  document.getElementById('dashOrders').innerHTML=last.map(o=>`<tr>
+    <td class="fb mono">${o.id}</td><td>${storePill(o.store)}</td><td>${o.data}</td><td>${o.cons||'—'}</td>
+    <td class="muted" style="font-size:11px">${o.op||'—'}</td>
+    <td class="tc">${(o.lines||[]).length}${(o.omaggi||[]).length>0?` <span class="sc-merce">+${o.omaggi.length}omg</span>`:''}</td>
+    <td class="tr mono">€ ${fmt(o.imp)}</td><td class="tr mono muted">€ ${fmt(o.iva_v)}</td>
+    <td class="tr mono fb">€ ${fmt(o.tot)}</td>
+    <td><span class="pill" style="background:${o.source==='pdf'?'#e3f2fd':'#f3e5f5'};color:${o.source==='pdf'?'#0d47a1':'#4a148c'}">${o.source}</span></td>
+  </tr>`).join('');
+
+  // Anomalie dashboard
+  document.getElementById('anomBadge').textContent=getAllAnomalies().length;
+  const anomSummary=DB.anomalies.slice(0,5);
+  document.getElementById('dashAnom').innerHTML=DB.anomalies.length===0
+    ?'<div class="alert alert-ok">✅ Nessuna anomalia rilevata</div>'
+    :anomSummary.map(a=>`<div class="alert alert-warn" style="margin-bottom:8px"><div><span class="abadge a-certa" style="margin-right:8px">${a.cert}</span><strong>${a.tipo}</strong><br><span class="muted" style="font-size:11px">${a.store} · ${a.det.split('\n')[0].substring(0,60)}...</span></div></div>`).join('')
+    +(DB.anomalies.length>5?`<div class="muted" style="font-size:11px;text-align:center;padding:8px">... e altre ${DB.anomalies.length-5} anomalie</div>`:'');
+
+  // Update topbar
+  document.getElementById('topbarInfo').textContent=`Giemme Bevande · ${totOrd} fatture · 4 store · €${fmt(totTot)} fatturato`;
+}
+
+// ============================================================
+// ALL ORDERS
+function renderAllOrders(){
+  const q=(document.getElementById('searchOrd').value||'').toLowerCase();
+  const fStore=document.getElementById('filterOrdStore').value;
+  const fSource=document.getElementById('filterOrdSource').value;
+  let ords=[...DB.orders].reverse().filter(o=>{
+    if(fStore&&o.store!==fStore) return false;
+    if(fSource&&o.source!==fSource) return false;
+    if(q&&!JSON.stringify(o).toLowerCase().includes(q)) return false;
+    return true;
+  });
+  document.getElementById('ordersBody').innerHTML=ords.map(o=>`<tr>
+    <td class="fb mono" style="cursor:pointer" onclick="showOrderDetail('${o.id}')">${o.id}</td>
+    <td>${storePill(o.store)}</td><td>${o.data}</td><td>${o.cons||'—'}</td>
+    <td class="muted" style="font-size:11px">${o.op||'—'}</td>
+    <td class="tc">${(o.lines||[]).length}${(o.omaggi||[]).length>0?` <span class="sc-merce">+${o.omaggi.length}</span>`:''}</td>
+    <td class="tr mono">€ ${fmt(o.imp)}</td><td class="tr mono muted">€ ${fmt(o.iva_v)}</td>
+    <td class="tr mono fb">€ ${fmt(o.tot)}</td>
+    <td><span class="pill" style="background:${o.source==='pdf'?'#e3f2fd':'#f3e5f5'};color:${o.source==='pdf'?'#0d47a1':'#4a148c'}">${o.source}</span></td>
+    <td><button class="btn btn-ghost btn-sm" onclick="showOrderDetail('${o.id}')">▾</button> <button class="btn btn-red btn-sm" onclick="deleteOrder('${o.id}')" title="Elimina fattura">🗑</button></td>
+  </tr>`).join('');
+  const totI=ords.reduce((s,o)=>s+(o.imp||0),0);
+  const totV=ords.reduce((s,o)=>s+(o.iva_v||0),0);
+  const totT=ords.reduce((s,o)=>s+(o.tot||0),0);
+  document.getElementById('ordersFoot').innerHTML=`<td colspan="6" class="fb">TOTALE (${ords.length} fatture)</td><td class="tr mono fb">€ ${fmt(totI)}</td><td class="tr mono muted">€ ${fmt(totV)}</td><td class="tr mono fb">€ ${fmt(totT)}</td><td colspan="2"></td>`;
+}
+
+function showOrderDetail(id){
+  const o=DB.orders.find(o=>String(o.id)===String(id));
+  if(!o) return;
+  const lines=(o.lines||[]);
+  const omaggi=(o.omaggi||[]);
+  document.getElementById('orderDetail').innerHTML=`<div class="card mt14">
+    <div class="card-head amber flexb"><span>📋 Dettaglio fattura #${o.id} — ${storePill(o.store)} — ${o.data}</span><button class="btn btn-ghost btn-sm" style="color:#fff;border-color:rgba(255,255,255,.3)" onclick="document.getElementById('orderDetail').innerHTML=''">✕</button></div>
+    <div class="scroll-x"><table class="ptable">
+      <thead><tr><th>#</th><th>Cod.</th><th>Descrizione</th><th>UM</th><th>Qtà</th><th>Pr.Listino €</th><th>Sconti</th><th>Pr.Netto €/cassa</th><th>Pz/cassa</th><th>€/pz</th><th>IVA %</th><th>Importo €</th></tr></thead>
+      <tbody>${lines.map((l,i)=>{
+        const pzB=l.pzCassa?`<span style="background:#e3f2fd;color:#0d47a1;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700">${l.pzCassa}pz</span>`:'—';
+        const upB=l.prezzoUnitario?`<span style="background:#e8f5e9;color:#1b5e20;padding:1px 6px;border-radius:4px;font-size:11px;font-weight:700;font-family:var(--mono)">€${fmt3(l.prezzoUnitario)}</span>`:'—';
+        return `<tr><td>${i+1}</td><td class="mono muted">${l.cod||'—'}</td><td class="fb">${l.desc}</td><td class="tc">${l.um}</td><td class="tc">${l.qta}</td>
+        <td class="tr mono">${fmt3(l.prezzoListino||0)}</td>
+        <td class="sconti-chain">${(l.sconti||[]).length>0?(l.sconti.map(s=>`${s>0?'+':''}${s}%`).join(' ')):'—'}</td>
+        <td class="tr mono fb">€ ${fmt3(l.prezzo||0)}</td>
+        <td class="tc">${pzB}</td><td class="tc">${upB}</td>
+        <td class="tc">${l.iva}%</td><td class="tr mono fb">€ ${fmt(l.importo)}</td></tr>`;
+      }).join('')}
+      ${omaggi.length>0?'<tr><td colspan="10" style="background:#e8f5e9;padding:6px 10px;font-size:11px;color:#2e7d32">🎁 OMAGGI: '+omaggi.map(g=>`${g.qta} ${g.um} ${g.desc}`).join(' · ')+'</td></tr>':''}
+      <tr style="background:#f8f9fa;font-weight:700"><td colspan="9">TOTALE</td><td class="tr mono">€ ${fmt(o.imp)}</td></tr>
+      </tbody>
+    </table></div>
+    <div class="card-body" style="font-size:12px;display:flex;gap:24px;flex-wrap:wrap">
+      <span>Trasporto: <strong>€ ${fmt(o.trasp||0)}</strong></span>
+      <span>IVA: <strong>€ ${fmt(o.iva_v)}</strong></span>
+      <span style="font-size:14px;font-weight:700">Totale fattura: € ${fmt(o.tot)}</span>
+      <span class="muted">Pagamento: ${o.pag||'—'}</span>
+      <span class="muted">Scadenza: ${o.cons||'—'}</span>
+    </div>
+  </div>`;
+}
+
+// ============================================================
+// STORE DETAIL
+function renderStoreDetail(){
+  const st=document.getElementById('storeFilter').value;
+  const ords=DB.orders.filter(o=>o.store===st);
+  if(ords.length===0){document.getElementById('storeDetailOut').innerHTML='<div class="alert alert-info">Nessuna fattura per questo store.</div>';return;}
+  const imp=ords.reduce((s,o)=>s+(o.imp||0),0);
+  const iva=ords.reduce((s,o)=>s+(o.iva_v||0),0);
+  const tot=ords.reduce((s,o)=>s+(o.tot||0),0);
+
+  // Product summary
+  const prodMap={};
+  ords.forEach(o=>(o.lines||[]).forEach(l=>{
+    const k=l.desc;
+    if(!prodMap[k]) prodMap[k]={desc:k,um:l.um,qtaTot:0,importoTot:0,prezzi:new Set()};
+    prodMap[k].qtaTot+=l.qta;
+    prodMap[k].importoTot+=l.importo;
+    prodMap[k].prezzi.add(l.prezzo);
+  }));
+  const prods=Object.values(prodMap).sort((a,b)=>b.importoTot-a.importoTot);
+
+  document.getElementById('storeDetailOut').innerHTML=`
+    <div class="card"><div class="card-head amber">🏪 ${storePill(st)} — Riepilogo</div>
+      <div class="card-body" style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px">
+        <div class="stat b" style="margin:0"><div class="stat-lbl">Fatture</div><div class="stat-val">${ords.length}</div></div>
+        <div class="stat" style="margin:0"><div class="stat-lbl">Imponibile</div><div class="stat-val" style="font-size:16px">€${fmt(imp)}</div></div>
+        <div class="stat d" style="margin:0"><div class="stat-lbl">IVA</div><div class="stat-val" style="font-size:16px">€${fmt(iva)}</div></div>
+        <div class="stat" style="margin:0;border-top-color:var(--amber)"><div class="stat-lbl">Totale</div><div class="stat-val" style="font-size:16px">€${fmt(tot)}</div></div>
+      </div>
+    </div>
+    <div class="card"><div class="card-head dark">🍺 Prodotti acquistati — per importo</div>
+      <div class="scroll-y" style="max-height:400px"><table class="dtable dark">
+        <thead><tr><th>#</th><th>Descrizione</th><th>UM</th><th class="tr">Qtà tot.</th><th class="tr">Importo €</th><th>Prezzi netti</th></tr></thead>
+        <tbody>${prods.map((p,i)=>{
+          const prezzi=[...p.prezzi];
+          const badge=prezzi.length>1?`<span class="abadge a-warn">⚠️ ${prezzi.length} prezzi: ${prezzi.map(pr=>'€'+fmt3(pr)).join(' / ')}</span>`:
+            `<span class="abadge a-ok">€ ${fmt3(prezzi[0]||0)}</span>`;
+          return `<tr><td class="muted">${i+1}</td><td class="fb">${p.desc}</td><td class="tc">${p.um}</td><td class="tr mono">${fmt(p.qtaTot,0)} ${p.um}</td><td class="tr mono fb">€ ${fmt(p.importoTot)}</td><td>${badge}</td></tr>`;
+        }).join('')}</tbody>
+      </table></div>
+    </div>`;
+}
+
+// ============================================================
+// WEEKLY
+function renderWeekly(){
+  populateMonthSelector();
+  const storeF=document.getElementById('weekStore').value;
+  const monthF=document.getElementById('monthSel').value;
+  const MESI=['','Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+  let orders=DB.orders;
+  if(storeF) orders=orders.filter(o=>o.store===storeF);
+  if(monthF){
+    const [fy,fm]=monthF.split('-');
+    orders=orders.filter(o=>{const p=(o.data||'').split('/');return p.length===3&&p[2]===fy&&p[1]===fm;});
+  }
+  if(orders.length===0){document.getElementById('weeklyOut').innerHTML='<div class="alert alert-info">Nessun ordine nel periodo selezionato.</div>';return;}
+  function getWeekKey(data){
+    const p=data.split('/');if(p.length!==3) return 'x';
+    const d=parseInt(p[0]);const wk=d<=7?1:d<=14?2:d<=21?3:4;
+    return p[2]+'-'+p[1]+'-W'+wk;
+  }
+  function weekLabel(key){
+    const m=key.match(/(\d{4})-(\d{2})-W(\d)/);if(!m) return key;
+    const [,y,mo,wk]=m;const start=(parseInt(wk)-1)*7+1;
+    const daysInMonth=new Date(parseInt(y),parseInt(mo),0).getDate();
+    const end=Math.min(start+6,daysInMonth);
+    return MESI[parseInt(mo)]+' '+y+' — Settimana '+wk+' ('+String(start).padStart(2,'0')+'–'+String(end).padStart(2,'0')+')';
+  }
+  const weeks={};
+  for(const o of orders){
+    const wk=getWeekKey(o.data||'');
+    if(!weeks[wk]) weeks[wk]={label:weekLabel(wk),ordini:[],prods:{}};
+    weeks[wk].ordini.push(o.id);
+    for(const l of (o.lines||[])){
+      const desc=l.desc||l.descrizione||'';
+      const key=(l.cod||l.codice||'')+'::'+desc;
+      if(!weeks[wk].prods[key]) weeks[wk].prods[key]={desc,um:l.um||'',qtaTot:0,prezzi:[],importoTot:0,nd:0};
+      const p=weeks[wk].prods[key];
+      p.qtaTot+=l.qta||0;p.importoTot+=l.importo||0;p.nd++;
+      const pr=l.prezzoNetto||l.prezzo_netto||l.prezzo||0;
+      if(pr>0&&!p.prezzi.includes(pr)) p.prezzi.push(pr);
+    }
+  }
+  const wkColors=['var(--blue)','#2e7d32','#e65100','#6a1b9a'];
+  const sortedWks=Object.keys(weeks).sort();
+  let html='';
+  sortedWks.forEach(function(wkKey,wi){
+    const w=weeks[wkKey];
+    const prods=Object.values(w.prods).sort(function(a,b){return b.importoTot-a.importoTot;});
+    const total=prods.reduce(function(s,p){return s+(p.importoTot||0);},0);
+    const bg=wkColors[wi%wkColors.length];
+    let rows='';
+    prods.forEach(function(p,i){
+      const prezzoMedio=p.qtaTot>0?(p.importoTot/p.qtaTot):0;
+      const hasDivPrezzo=p.prezzi.length>1;
+      const rowStyle=hasDivPrezzo?'background:#fff8e1':'';
+      const prezziStr=hasDivPrezzo?('⚠️ prezzi diversi: '+p.prezzi.map(function(x){return '€'+x.toFixed(3);}).join(' / ')):'';
+      rows+='<tr style="'+rowStyle+'">'
+        +'<td class="tc muted">'+(i+1)+'</td>'
+        +'<td class="fb" style="font-size:11px">'+p.desc+'</td>'
+        +'<td class="tr mono fb">'+p.qtaTot.toFixed(0)+'</td>'
+        +'<td class="tc">'+p.um+'</td>'
+        +'<td class="tr mono">€'+prezzoMedio.toFixed(3)+'</td>'
+        +'<td class="tr mono fb">€'+p.importoTot.toFixed(2)+'</td>'
+        +'<td class="tc">'+p.nd+'</td>'
+        +'<td style="font-size:10px;max-width:200px">'+(prezziStr?'<span class="abadge a-warn" style="font-size:9px">'+prezziStr+'</span>':'')+'</td>'
+        +'</tr>';
+    });
+    html+='<div style="border-radius:10px;margin-bottom:18px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08)">'
+      +'<div style="background:'+bg+';color:#fff;padding:10px 16px;display:flex;justify-content:space-between;align-items:center">'
+      +'<span style="font-weight:700">'+w.label+'</span>'
+      +'<span style="font-size:11px">'+w.ordini.length+' ordini · '+prods.length+' prodotti · €'+total.toFixed(2)+'</span>'
+      +'</div>'
+      +'<div style="overflow-x:auto"><table class="dtable">'
+      +'<thead><tr><th>#</th><th>Prodotto</th><th class="tr">Qtà</th><th>UM</th><th class="tr">Pr. medio €</th><th class="tr">Tot. spesa €</th><th class="tc">Doc.</th><th>Note</th></tr></thead>'
+      +'<tbody>'+rows+'</tbody>'
+      +'<tfoot><tr><td colspan="5" class="tr fb">TOTALE — '+prods.length+' prodotti</td><td class="tr fb mono">€'+total.toFixed(2)+'</td><td colspan="2"></td></tr></tfoot>'
+      +'</table></div></div>';
+  });
+  document.getElementById('weeklyOut').innerHTML=html||'<div class="alert alert-info">Nessun dato.</div>';
+}
+
+function toggleWk(wi){const el=document.getElementById('wk'+wi);el.classList.toggle('open');}
+
+// ============================================================
+// ANOMALIE
+function renderAnom(){
+  const catF=document.getElementById('fAnomCat').value;
+  const certF=document.getElementById('fAnomCert').value;
+  const allAnomalies=getAllAnomalies();
+  let filtered=allAnomalies;
+  if(catF) filtered=filtered.filter(a=>a.cat===catF);
+  if(certF) filtered=filtered.filter(a=>(a.cert||'').includes(certF));
+  const cats=['PREZZO','SCOSTAMENTO','AUMENTO','QUANTITÀ','NOME PRODOTTO','DATI MANCANTI'];
+  const catIcons={'PREZZO':'💰','SCOSTAMENTO':'📊','AUMENTO':'📈','QUANTITÀ':'📦','NOME PRODOTTO':'🏷️','DATI MANCANTI':'❓'};
+  let html='';
+  for(const cat of cats){
+    const items=filtered.filter(a=>a.cat===cat);
+    if(items.length===0) continue;
+    html+=`<div class="section-hd mt14">${catIcons[cat]||'⚠️'} ${cat} (${items.length})</div>`;
+    items.forEach((a,ai)=>{
+      html+=`<div style="padding:12px 0;border-bottom:1px solid #f0f1f3"><div class="flexb"><div>${certBadge(a.cert)} <span class="fb" style="margin-left:6px">#${a.n} — ${a.tipo||a.cat}</span></div>
+        <span class="muted" style="font-size:11px">${storePill(a.store)} · ${a.ordine}</span></div>
+        <div class="anom-detail">${(a.det||'').replace(/\n/g,'<br>')}</div></div>`;
+    });
+  }
+  document.getElementById('anomBody').innerHTML=html||'<div class="alert alert-ok">✅ Nessuna anomalia trovata.</div>';
+  document.getElementById('verifList').innerHTML=(DB.verifications||[]).map(v=>`<li>${v}</li>`).join('');
+  const badge=document.getElementById('anomBadge');
+  if(badge) badge.textContent=allAnomalies.length;
+}
+
+function renderOmaggi(){
+  const fStore=document.getElementById('fOmaggiStore')?document.getElementById('fOmaggiStore').value:'';
+  const rows=[];
+  for(const o of DB.orders){
+    if(fStore&&o.store!==fStore) continue;
+    for(const g of (o.omaggi||[])){
+      rows.push({data:o.data,fattura:o.id,store:o.store,cod:g.cod||'—',desc:g.desc,um:g.um,qta:g.qta,prezzoListino:g.prezzoListino||0});
+    }
+  }
+  // ordina per data desc
+  rows.sort((a,b)=>{
+    const da=a.data.split('/').reverse().join('');
+    const db=b.data.split('/').reverse().join('');
+    return db.localeCompare(da);
+  });
+  const totQta=rows.reduce((s,r)=>s+r.qta,0);
+  const totVal=rows.reduce((s,r)=>s+(r.prezzoListino*r.qta||0),0);
+  document.getElementById('omaggiBody').innerHTML=rows.length===0
+    ?'<tr><td colspan="8" class="tc muted" style="padding:20px">Nessun omaggio ricevuto</td></tr>'
+    :rows.map(r=>`<tr class="omaggio-row">
+        <td>${r.data}</td>
+        <td class="mono fb">${r.fattura}</td>
+        <td>${storePill(r.store)}</td>
+        <td class="mono muted" style="font-size:10px">${r.cod}</td>
+        <td class="fb">${r.desc}</td>
+        <td class="tc">${r.um}</td>
+        <td class="tc fb">${r.qta}</td>
+        <td class="tr mono">${r.prezzoListino>0?'€ '+fmt3(r.prezzoListino*r.qta):'—'}</td>
+      </tr>`).join('');
+  document.getElementById('omaggiFoot').innerHTML=`<tr><td colspan="6" class="fb">TOTALE (${rows.length} righe)</td><td class="tc fb">${totQta}</td><td class="tr mono fb">${totVal>0?'€ '+fmt(totVal):'—'}</td></tr>`;
+  const badge=document.getElementById('omaggiBadge');
+  if(badge) badge.textContent=rows.length;
+}
+
+// ============================================================
+// NOTE DI CREDITO
+function renderCredito(){
+  const nc=DB.note_credito||[];
+  document.getElementById('creditoBody').innerHTML=nc.length===0
+    ?'<div class="alert alert-ok">✅ Nessuna nota di credito presente.</div>'
+    :nc.map(n=>`<div class="nc-item">${n}</div>`).join('');
+}
+
+// ============================================================
+// LISTINO CONCORDATO
+function renderListinoConcordato(){
+  const q=(document.getElementById('searchLC')||{}).value||'';
+  const ql=q.toLowerCase();
+  const items=(DB.listino_concordato||[]).filter(p=>!ql||p.desc.toLowerCase().includes(ql)||(p.cod||'').toLowerCase().includes(ql));
+  document.getElementById('lcCount').textContent=DB.listino_concordato.length;
+
+  const scost={};
+  (DB.orders||[]).forEach(o=>{
+    (o.lines||[]).forEach(l=>{
+      const lc=items.find(p=>p.cod===l.cod||p.desc===l.desc);
+      if(!lc) return;
+      const diff=(l.prezzo||0)-lc.price;
+      if(Math.abs(diff)>0.005){
+        if(!scost[lc.cod||lc.desc]) scost[lc.cod||lc.desc]=[];
+        scost[lc.cod||lc.desc].push({ordine:o.id,store:o.store,data:o.data,prezzo:l.prezzo,diff});
+      }
+    });
+  });
+
+  let rows='';
+  items.forEach((p,i)=>{
+    const key=p.cod||p.desc;
+    const sc=scost[key]||[];
+    const badge=sc.length>0?`<span class="abadge a-certa">🔴 ${sc.length} scostamenti</span>`:`<span class="abadge a-ok">✅ OK</span>`;
+    rows+=`<tr>
+      <td style="font-size:11px;color:var(--muted)">${p.cod||'—'}</td>
+      <td style="font-size:12px;font-weight:600">${p.desc}</td>
+      <td class="tc">${p.um}</td>
+      <td class="tr mono fb">€ ${fmt3(p.price)}</td>
+      <td class="tc muted">${p.iva}%</td>
+      <td>${badge}${sc.length>0?'<br><span style="font-size:10px;color:var(--muted)">'+sc.slice(0,3).map(s=>`ft.${s.ordine} ${s.store} €${fmt3(s.prezzo)} (${s.diff>0?'+':''}€${s.diff.toFixed(3)})`).join(' · ')+'</span>':''}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="editLC(${i})">✏</button> <button class="btn btn-red btn-sm" onclick="deleteLC(${i})">✕</button></td>
+    </tr>`;
+  });
+  const tbody=document.getElementById('listinoBody');
+  if(tbody) tbody.innerHTML=rows||'<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">Nessun prodotto concordato — aggiungi prodotti con il pulsante in basso</td></tr>';
+}
+
+function openLCModal(idx=null){
+  document.getElementById('lc_idx').value=idx!=null?idx:'';
+  if(idx!=null){
+    const p=DB.listino_concordato[idx];
+    document.getElementById('lc_cod').value=p.cod||'';
+    document.getElementById('lc_desc').value=p.desc;
+    document.getElementById('lc_um').value=p.um;
+    document.getElementById('lc_price').value=p.price;
+    document.getElementById('lc_iva').value=p.iva;
+  } else {
+    document.getElementById('lc_cod').value='';
+    document.getElementById('lc_desc').value='';
+    document.getElementById('lc_price').value='';
+  }
+  document.getElementById('lcModal').classList.add('open');
+}
+function closeLCModal(){document.getElementById('lcModal').classList.remove('open');}
+function editLC(i){openLCModal(i);}
+function checkDeletePassword(){
+  const pwd=prompt('🔒 Inserisci la password per confermare la cancellazione:');
+  if(pwd!=='Donts2022'){alert('❌ Password errata. Operazione annullata.');return false;}
+  return true;
+}
+
+function deleteAllOrders(){
+  if(!checkDeletePassword()) return;
+  if(!confirm(`⚠️ Eliminare tutte le ${DB.orders.length} fatture e tutte le anomalie? L'operazione non è reversibile.`)) return;
+  const ids=[...DB.orders.map(o=>o.id)];
+  DB.orders=[];
+  DB.anomalies=[];
+  ids.forEach(id=>sbDeleteOrder(id));
+  saveDBLocal();
+  document.getElementById('orderDetail').innerHTML='';
+  refreshAll();
+  showStatus('🗑 Tutte le fatture eliminate','warn');
+}
+
+function deleteOrder(id){
+  if(!checkDeletePassword()) return;
+  if(!confirm(`⚠️ Eliminare la fattura #${id}? L'operazione non è reversibile.`)) return;
+  DB.orders=DB.orders.filter(o=>String(o.id)!==String(id));
+  DB.anomalies=DB.anomalies.filter(a=>String(a.ordine)!==String(id));
+  sbDeleteOrder(id);
+  saveDBLocal();
+  document.getElementById('orderDetail').innerHTML='';
+  refreshAll();
+  showStatus('🗑 Fattura eliminata','warn');
+}
+
+function deleteProd(i){
+  if(!confirm(`Eliminare "${DB.products[i].desc}"?`)) return;
+  DB.products.splice(i,1);
+  saveDB();renderProds();
+}
+function clearAllProds(){
+  if(!checkDeletePassword()) return;
+  if(!confirm('⚠️ Svuotare tutta l\'anagrafica prodotti? Verrà ricreata al prossimo caricamento fatture.')) return;
+  DB.products=[];
+  saveDB();renderProds();
+}
+
+function deleteLC(i){if(confirm('Rimuovere dal listino concordato?')){DB.listino_concordato.splice(i,1);saveDB();renderListinoConcordato();}}
+function saveLC(){
+  const idx=document.getElementById('lc_idx').value;
+  const p={cod:document.getElementById('lc_cod').value.trim(),desc:document.getElementById('lc_desc').value.trim(),um:document.getElementById('lc_um').value,price:parseFloat(document.getElementById('lc_price').value)||0,iva:parseInt(document.getElementById('lc_iva').value)||22};
+  if(!p.desc||p.price<=0){alert('Descrizione e prezzo obbligatori');return;}
+  if(idx!==''){DB.listino_concordato[parseInt(idx)]=p;}
+  else DB.listino_concordato.push(p);
+  saveDB();closeLCModal();renderListinoConcordato();
+}
+
+// ============================================================
+// ANAGRAFICA PRODOTTI
+function renderProds(){
+  document.getElementById('prodBody').innerHTML=DB.products.map((p,i)=>{
+    const pzB=p.pzCassa?`<span style="background:#e3f2fd;color:#0d47a1;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700">${p.pzCassa}pz</span>`:'<span style="color:#ccc">—</span>';
+    const pu=p.prezzoUnitario||(p.pzCassa&&p.price?Math.round(p.price/p.pzCassa*1000)/1000:null);
+    const upB=pu?`<span style="background:#e8f5e9;color:#1b5e20;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:700;font-family:var(--mono)">€${fmt3(pu)}</span>`:'<span style="color:#ccc">—</span>';
+    return `<tr><td class="tc muted">${i+1}</td><td style="font-size:10px;color:var(--muted)">${p.cod||'—'}</td>
+    <td class="fb">${p.desc}</td><td class="tc">${p.um}</td>
+    <td class="tr fb mono">€${fmt3(p.price)}</td>
+    <td class="tc">${pzB}</td><td class="tr">${upB}</td>
+    <td class="tc">${p.iva}%</td>
+    <td><button class="btn btn-ghost btn-sm" onclick="openProdModal(${i})">✏</button> <button class="btn btn-red btn-sm" onclick="deleteProd(${i})">🗑</button></td></tr>`;
+  }).join('')||
+    '<tr><td colspan="9" class="tc muted" style="padding:20px">Nessun prodotto — verranno aggiunti automaticamente al caricamento delle fatture</td></tr>';
+}
+function openProdModal(idx=null){
+  document.getElementById('mp_idx').value=idx!=null?idx:'';
+  if(idx!=null){const p=DB.products[idx];document.getElementById('mp_cod').value=p.cod||'';document.getElementById('mp_desc').value=p.desc;document.getElementById('mp_um').value=p.um;document.getElementById('mp_price').value=p.price;document.getElementById('mp_iva').value=p.iva;}
+  else{document.getElementById('mp_cod').value='';document.getElementById('mp_desc').value='';document.getElementById('mp_price').value='';}
+  document.getElementById('prodModal').classList.add('open');
+}
+function closeProdModal(){document.getElementById('prodModal').classList.remove('open');}
+function saveProd(){
+  const idx=document.getElementById('mp_idx').value;
+  const p={cod:document.getElementById('mp_cod').value.trim(),desc:document.getElementById('mp_desc').value.trim(),um:document.getElementById('mp_um').value,price:parseFloat(document.getElementById('mp_price').value)||0,iva:parseInt(document.getElementById('mp_iva').value)||22};
+  if(!p.desc){alert('Descrizione obbligatoria');return;}
+  if(idx!==''){DB.products[parseInt(idx)]=p;}else DB.products.push(p);
+  saveDB();closeProdModal();renderProds();
+}
+
+// ============================================================
+// EXPORT EXCEL
+function exportExcel(){
+  if(!DB.orders.length){alert('Nessun dato da esportare');return;}
+  const wb=XLSX.utils.book_new();
+  const rows=[['N° Fattura','Store','Data','Scadenza','Rif. Ordine','Cod. Art.','Descrizione','UM','Qtà','Pr.Listino','Sconti','Pr.Netto','IVA%','Importo','Trasporto','Tot.Fattura']];
+  DB.orders.forEach(o=>{
+    (o.lines||[]).forEach(l=>{
+      rows.push([o.id,o.store,o.data,o.cons||'',o.op||'',l.cod||'',l.desc,l.um,l.qta,l.prezzoListino||'',
+        (l.sconti||[]).join(' ')||'',l.prezzo,l.iva+'%',l.importo,o.trasp||0,o.tot]);
+    });
+    (o.omaggi||[]).forEach(g=>{
+      rows.push([o.id,o.store,o.data,o.cons||'',o.op||'',g.cod||'',g.desc+' [OMAGGIO]',g.um,g.qta,'','','','','','','']);
+    });
+  });
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'Fatture');
+  const lcRows=[['Codice','Descrizione','UM','Prezzo Concordato','IVA%'],(DB.listino_concordato||[]).map(p=>[p.cod||'',p.desc,p.um,p.price,p.iva+'%'])].flat();
+  if(DB.listino_concordato.length>0) XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Codice','Descrizione','UM','Prezzo Concordato','IVA%'],...DB.listino_concordato.map(p=>[p.cod||'',p.desc,p.um,p.price,p.iva+'%'])]),'Listino Concordato');
+  XLSX.writeFile(wb,`GIEMME_BEVANDE_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+// ============================================================
+// REFRESH ALL
+function refreshAll(){
+  saveDB();
+  renderDashboard();
+  renderAllOrders();
+  renderAnom();
+  renderOmaggi();
+}
+
+// ============================================================
+// INIT
+function resetDB(){if(!confirm('⚠️ Vuoi cancellare tutti i dati Giemme e tornare ai valori iniziali?')) return;localStorage.removeItem(DB_KEY);location.reload();}
+function init(){
+  populateMonthSelector();
+  renderDashboard();
+  renderAllOrders();
+  renderAnom();
+  renderOmaggi();
+  renderCredito();
+  renderListinoConcordato();
+  sbLoadAll();
+}
+init();
+</script>
+</body>
+</html>
