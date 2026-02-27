@@ -361,7 +361,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
 // ============================================================
 // DATABASE — Supabase + localStorage fallback
 const SUPABASE_URL = 'https://fkivfnpmwvponqbwxoad.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_YqS6Zcs4QP-4cdYviUX1fQ_F-qnj3ki';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZraXZmbnBtd3Zwb25xYnd4b2FkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5NTY2MTUsImV4cCI6MjA4NzUzMjYxNX0.vh4frux2aAtC0sT18NZoE1Lh8dMJa9FQ7oXNUwpu-B8';
 const SB = (path, opts={}) => fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
   ...opts,
   headers: {'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json','Prefer':opts.prefer||'return=representation',...(opts.headers||{})}
@@ -467,10 +467,18 @@ async function sbDeleteOrder(id){
 async function sbSyncAll(){
   showStatus('☁️ Salvataggio su Supabase...','info');
   try{
-    await SB('ut_orders?id=neq.',{method:'DELETE'});
-    for(const o of DB.orders) await sbSaveOrder(o);
-    await SB('ut_anomalies?id=gt.0',{method:'DELETE'});
-    for(const a of DB.anomalies) await sbSaveAnomaly(a);
+    // Upsert orders in batches of 20 (no delete, avoids timeout)
+    const BATCH = 20;
+    for(let i=0;i<DB.orders.length;i+=BATCH){
+      const batch=DB.orders.slice(i,i+BATCH).map(o=>({
+        id:o.id,store:o.store,data:o.data,cons:o.cons,op:o.op,
+        imp:o.imp,iva_v:o.iva_v,tot:o.tot,source:o.source||'pdf',
+        pagamento:o.pagamento||'',
+        lines:JSON.stringify(o.lines||[])
+      }));
+      await SB('ut_orders',{method:'POST',body:JSON.stringify(batch),headers:{'Prefer':'resolution=merge-duplicates,return=minimal'}});
+    }
+    // Upsert products
     for(const p of DB.products) await sbSaveProduct(p);
     showStatus('✅ Salvato su Supabase','ok');
   }catch(e){
@@ -958,7 +966,28 @@ function confirmSave(){
     const lc=(DB.listino_concordato||[]).find(pr=>pr.cod===item.codice||pr.desc===item.desc||(item.desc&&item.desc.startsWith(pr.desc.substring(0,25))));
     if(lc&&item.prezzo_netto&&Math.abs(item.prezzo_netto-lc.price)>0.01){
       const diff=item.prezzo_netto-lc.price;
-      DB.anomalies.push({n:DB.anomalies.length+1,cat:'PREZZO',tipo:'Prezzo diverso dal listino concordato',cert:'🔴 CERTA',store,ordine:ordNum,det:`${item.desc}\nOrdine €${item.prezzo_netto} vs concordato €${lc.price} (${diff>0?'+':''}€${diff.toFixed(3)})`});
+      DB.anomalies.push({n:DB.anomalies.length+1,cat:'PREZZO',tipo:'Prezzo diverso dal listino concordato',cert:'🔴 CERTA',store,ordine:ordNum,det:`${item.desc}\\nOrdine €${item.prezzo_netto} vs concordato €${lc.price} (${diff>0?'+':''}\u20ac${diff.toFixed(3)})`});
+    }
+    // Verifica prezzo vs minimo storico stesso prodotto
+    const storicoDesc=(item.desc||'').substring(0,30);
+    const prezziStorici=[];
+    for(const ord of DB.orders.filter(o=>o.id!==ordNum)){
+      for(const line of (ord.lines||[])){
+        const ld=(line.desc||line.descrizione||'').substring(0,30);
+        if((item.codice&&line.codice===item.codice)||(storicoDesc&&ld===storicoDesc)){
+          const pr=line.prezzo_netto||line.prezzoNetto||line.prezzo||0;
+          if(pr>0) prezziStorici.push({prezzo:pr,ordine:ord.id,store:ord.store,data:ord.data});
+        }
+      }
+    }
+    if(prezziStorici.length>0){
+      const prezzoMin=Math.min(...prezziStorici.map(x=>x.prezzo));
+      const refMin=prezziStorici.find(x=>x.prezzo===prezzoMin);
+      if(item.prezzo_netto>prezzoMin+0.01){
+        const diffMin=item.prezzo_netto-prezzoMin;
+        DB.anomalies.push({n:DB.anomalies.length+1,cat:'PREZZO',tipo:'Prezzo superiore al minimo storico',cert:'🟡 DA VERIFICARE',store,ordine:ordNum,
+          det:`${item.desc}\\nPrezzo attuale: €${item.prezzo_netto} | Minimo storico: €${prezzoMin} (ord. ${refMin.ordine} — ${refMin.store}, ${refMin.data}) | Differenza: +€${diffMin.toFixed(3)}`});
+      }
     }
   }
   if(!dataCons||dataCons==='N/D')
