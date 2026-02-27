@@ -273,7 +273,7 @@ input:focus,select:focus{outline:none;border-color:var(--blue);background:#fff}
 <!-- ===== RIEPILOGO SETTIMANALE ===== -->
 <div id="page-settimane" class="page">
   <div class="filter-bar" style="margin-bottom:16px">
-    <select id="weekStore" onchange="renderWeekly()" style="min-width:200px"><option value="ALL">Tutti gli store</option><option value="TUSCOLANA">TUSCOLANA</option><option value="TRASTEVERE">TRASTEVERE</option><option value="PIAZZA ISTRIA">PIAZZA ISTRIA</option><option value="PONTE MILVIO">PONTE MILVIO</option></select>
+    <select id="weekStore" onchange="renderWeekly()" style="min-width:200px"><option value="">Tutti gli store</option><option value="ALL">Tutti gli store</option><option value="TUSCOLANA">TUSCOLANA</option><option value="TRASTEVERE">TRASTEVERE</option><option value="PIAZZA ISTRIA">PIAZZA ISTRIA</option><option value="PONTE MILVIO">PONTE MILVIO</option></select>
   </div>
   <div id="weeklyOut"></div>
 </div>
@@ -283,7 +283,7 @@ input:focus,select:focus{outline:none;border-color:var(--blue);background:#fff}
   <div class="card"><div class="card-head neutral flexb">
     <span>⚠️ Anomalie rilevate — controllo automatico</span>
     <div class="filter-bar">
-      <select id="fAnomCat" onchange="renderAnom()" style="min-width:140px"><option value="">Tutte</option><option>PREZZO</option><option>QUANTITÀ</option><option>NOME PRODOTTO</option><option>DATI MANCANTI</option></select>
+      <select id="fAnomCat" onchange="renderAnom()" style="min-width:140px"><option value="">Tutte</option><option>PREZZO</option><option>SCOSTAMENTO</option><option>QUANTITÀ</option><option>NOME PRODOTTO</option><option>DATI MANCANTI</option></select>
       <select id="fAnomCert" onchange="renderAnom()" style="min-width:140px"><option value="">Tutte</option><option value="CERTA">🔴 Certe</option><option value="DA VERIFICARE">🟡 Da verificare</option></select>
     </div>
   </div><div class="scroll-y" style="max-height:600px"><div id="anomBody" class="card-body"></div></div></div>
@@ -343,7 +343,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
 
 // DATABASE — Supabase + localStorage fallback
 const SUPABASE_URL = 'https://fkivfnpmwvponqbwxoad.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_YqS6Zcs4QP-4cdYviUX1fQ_F-qnj3ki';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZraXZmbnBtd3Zwb25xYnd4b2FkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5NTY2MTUsImV4cCI6MjA4NzUzMjYxNX0.vh4frux2aAtC0sT18NZoE1Lh8dMJa9FQ7oXNUwpu-B8';
 const SB = (path, opts={}) => fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
   ...opts,
   headers: {'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json','Prefer':opts.prefer||'return=representation',...(opts.headers||{})}
@@ -438,21 +438,23 @@ async function sbDeleteOrder(id){
 async function sbSyncAll(){
   showStatus('☁️ Salvataggio su Supabase...','info');
   try{
-    // Clear remote orders and re-insert all (ensures deletions propagate)
-    await SB('marr_orders?id=neq.',{method:'DELETE'});
-    for(const o of DB.orders) await sbSaveOrder(o);
-    // Sync anomalies: clear and re-insert
-    await SB('marr_anomalies?id=gt.0',{method:'DELETE'});
-    for(const a of DB.anomalies) await sbSaveAnomaly(a);
-    // Sync products
+    const BATCH=20;
+    for(let i=0;i<DB.orders.length;i+=BATCH){
+      const batch=DB.orders.slice(i,i+BATCH).map(o=>{
+        const row={id:o.id,store:o.store,data:o.data,cons:o.cons,op:o.op||'',imp:o.imp,iva_v:o.iva_v,tot:o.tot,source:o.source||'pdf',pagamento:o.pagamento||'',lines:JSON.stringify(o.lines||[])};
+        if(o.omaggi!==undefined) row.omaggi=JSON.stringify(o.omaggi||[]);
+        if(o.trasp!==undefined) row.trasp=o.trasp||0;
+        return row;
+      });
+      await SB('marr_orders',{method:'POST',body:JSON.stringify(batch),headers:{'Prefer':'resolution=merge-duplicates,return=minimal'}});
+    }
     for(const p of DB.products) await sbSaveProduct(p);
     showStatus('✅ Salvato su Supabase','ok');
   }catch(e){
     console.warn('sbSyncAll failed',e);
-    showStatus('⚠️ Errore salvataggio Supabase — dati salvati localmente','warn');
+    showStatus('⚠️ Errore Supabase — salvato localmente','warn');
   }
 }
-
 function showStatus(msg,type){
   const el=document.getElementById('syncStatus');
   if(!el) return;
@@ -872,6 +874,33 @@ function confirmSave(){
     if(lc&&item.prezzo_netto&&item.prezzo_netto>lc.price+0.01)
       DB.anomalies.push({n:DB.anomalies.length+1,cat:'PREZZO',tipo:'Prezzo superiore al listino concordato',cert:'CERTA',store,ordine:ordNum,det:`${item.desc}\nDDT €${item.prezzo_netto} vs concordato €${lc.price} (+€${(item.prezzo_netto-lc.price).toFixed(2)})`});
   }
+  
+  // Anomalia: prezzo superiore al minimo storico
+  for(const item of p.items){
+    const pr=item.prezzo_netto;
+    if(!pr||pr<=0) continue;
+    const storicoDesc=(item.desc||'').substring(0,30);
+    const prezziStorici=[];
+    for(const ord of DB.orders.filter(o=>o.id!==numFattura)){
+      for(const line of (ord.lines||[])){
+        const ld=(line.desc||'').substring(0,30);
+        if((item.codice&&line.codice===item.codice)||(storicoDesc&&ld===storicoDesc)){
+          const lpr=line.prezzo_netto||line.prezzo||0;
+          if(lpr>0) prezziStorici.push({prezzo:lpr,ordine:ord.id,store:ord.store,data:ord.data});
+        }
+      }
+    }
+    if(prezziStorici.length>0){
+      const prezzoMin=Math.min(...prezziStorici.map(x=>x.prezzo));
+      const refMin=prezziStorici.find(x=>x.prezzo===prezzoMin);
+      if(pr>prezzoMin+0.01){
+        const diffMin=pr-prezzoMin;
+        DB.anomalies.push({n:DB.anomalies.length+1,cat:'PREZZO',tipo:'Prezzo superiore al minimo storico',cert:'🟡 DA VERIFICARE',store,ordine:numFattura,
+          det:`${item.desc}\nPrezzo attuale: €${pr.toFixed(3)} | Minimo storico: €${prezzoMin.toFixed(3)} (ord. ${refMin.ordine} — ${refMin.store}, ${refMin.data}) | Differenza: +€${diffMin.toFixed(3)}`});
+      }
+    }
+  }
+
   // Auto-update listino — tiene il prezzo PIÙ BASSO
   for(const item of p.items){
     if(!item.codice||!item.desc) continue;
@@ -1002,6 +1031,57 @@ function showTab(id){
 }
 
 // DASHBOARD
+// Helper: tutte le anomalie inclusi scostamenti calcolati al volo
+function getAllAnomalies(){
+  function getWkKey(data){
+    const p=(data||'').split('/');
+    if(p.length!==3) return 'x';
+    const d=parseInt(p[0]);
+    return p[2]+'-'+p[1]+'-W'+(d<=7?1:d<=14?2:d<=21?3:4);
+  }
+  const byPW={};
+  for(const o of DB.orders){
+    const wk=getWkKey(o.data);
+    for(const l of (o.lines||[])){
+      const desc=(l.desc||l.descrizione||'');
+      const key=desc+'::'+wk;
+      if(!byPW[key]) byPW[key]={desc,wk,store:o.store,ordini:[],prezzi:[]};
+      byPW[key].ordini.push(o.id);
+      const pr=l.prezzoNetto||l.prezzo_netto||l.prezzo||0;
+      if(pr>0&&!byPW[key].prezzi.includes(pr)) byPW[key].prezzi.push(pr);
+    }
+  }
+  const MESI=['','Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+  const scost=[];
+  let n=DB.anomalies.length+1;
+  for(const entry of Object.values(byPW)){
+    if(entry.prezzi.length<2) continue;
+    const m=entry.wk.match(/(\d{4})-(\d{2})-W(\d)/);
+    const wkLabel=m?(MESI[parseInt(m[2])]+' '+m[1]+' — Settimana '+m[3]):entry.wk;
+    scost.push({n:n++,cat:'SCOSTAMENTO',tipo:'Prezzi diversi nella stessa settimana',cert:'🟡 DA VERIFICARE',
+      store:entry.store,ordine:[...new Set(entry.ordini)].join(', '),
+      det:entry.desc+'\n'+wkLabel+'\nPrezzi rilevati: '+entry.prezzi.map(x=>'€'+x.toFixed(3)).join(' / ')+' | Scostamento: €'+(Math.max(...entry.prezzi)-Math.min(...entry.prezzi)).toFixed(3)});
+  }
+  return [...DB.anomalies,...scost];
+}
+
+function populateMonthSelector(){
+  const sel=document.getElementById('monthSel');
+  if(!sel) return;
+  const months=new Set();
+  for(const o of DB.orders){
+    const p=(o.data||'').split('/');
+    if(p.length===3) months.add(p[2]+'-'+p[1]);
+  }
+  const sorted=[...months].sort().reverse();
+  const MESI=['','Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+  const cur=sel.value;
+  sel.innerHTML='<option value="">Tutti i mesi</option>'+sorted.map(m=>{
+    const [y,mo]=m.split('-');
+    return '<option value="'+m+'"'+(m===cur?' selected':'')+'>'+MESI[parseInt(mo)]+' '+y+'</option>';
+  }).join('');
+}
+
 function renderDashboard(){
   const totOrd=DB.orders.length;
   const totLines=DB.orders.reduce((s,o)=>s+(o.lines||[]).length,0);
@@ -1040,7 +1120,7 @@ function renderDashboard(){
     <td class="fb mono">${o.id}</td><td>${storePill(o.store)}</td><td>${o.data}</td><td>${o.cons||'—'}</td><td class="tc">${(o.lines||[]).length}</td>
     <td class="tr mono">€${fmt(o.imp)}</td><td class="tr mono">€${fmt(o.iva_v)}</td><td class="tr mono fb">€${fmt(o.tot)}</td><td>${sourceBadge(o.source)}</td></tr>`).join('');
   document.getElementById('topbarInfo').textContent=`MARR S.p.A. (Gruppo Cremonini) · FEBBRAIO 2026 · ${totOrd} DDT · ${pdfCount} da PDF`;
-  document.getElementById('anomBadge').textContent=DB.anomalies.length;
+  document.getElementById('anomBadge').textContent=getAllAnomalies().length;
 }
 
 // STORE DETAIL
@@ -1130,52 +1210,109 @@ function getWeek(d){
 const wkColors={1:'#dce6f1',2:'#fce4d6',3:'#e2efda',4:'#fff2cc'};
 const wkLabels={1:'S1: 01–07 feb',2:'S2: 08–14 feb',3:'S3: 15–21 feb',4:'S4: 22–28 feb+'};
 function renderWeekly(){
-  const sf=document.getElementById('weekStore').value;
-  const allStores=[...new Set(DB.orders.map(o=>o.store).filter(Boolean))];
-  const stores=sf==='ALL'?allStores:[sf];
-  let html='';
-  if(DB.orders.length===0){document.getElementById('weeklyOut').innerHTML='<div class="alert alert-info">Nessun DDT. Carica DDT MARR per vedere il riepilogo.</div>';return;}
-  for(const store of stores){
-    const sords=DB.orders.filter(o=>o.store===store);
-    if(sords.length===0) continue;
-    const totTot=sords.reduce((s,o)=>s+(o.tot||0),0);
-    html+=`<div class="card"><div class="card-head blue flexb"><span>🏪 ${store}</span><span style="font-size:11px;opacity:.85">Totale: €${fmt(totTot)} · ${sords.length} DDT</span></div>
-    <div class="scroll-x"><table class="dtable"><thead><tr><th>Settimana</th><th>N° DDT</th><th>Data</th><th>Cons.</th><th>Righe</th><th>Fonte</th><th class="tr">Imp. €</th><th class="tr">IVA €</th><th class="tr">Tot. €</th></tr></thead><tbody>`;
-    for(const wk of [1,2,3,4]){
-      const wo=sords.filter(o=>getWeek(o.data)===wk);
-      if(wo.length===0) continue;
-      const wI=wo.reduce((s,o)=>s+(o.imp||0),0);
-      html+=`<tr><td colspan="9" style="background:${wkColors[wk]};font-weight:700;color:#1f4e79;padding:7px 10px;font-size:12px">${wkLabels[wk]} — ${wo.length} DDT · €${fmt(wI)}</td></tr>`;
-      wo.forEach(o=>{html+=`<tr><td class="muted" style="font-size:10px">${wkLabels[wk]}</td><td class="fb mono">${o.id}</td><td>${o.data}</td><td>${o.cons||'—'}</td><td class="tc">${(o.lines||[]).length}</td><td>${sourceBadge(o.source)}</td><td class="tr mono">€${fmt(o.imp)}</td><td class="tr mono">€${fmt(o.iva_v)}</td><td class="tr mono fb">€${fmt(o.tot)}</td></tr>`;});
-    }
-    html+=`</tbody></table></div></div>`;
+  populateMonthSelector();
+  const storeF=document.getElementById('weekStore').value;
+  const monthF=document.getElementById('monthSel').value;
+  const MESI=['','Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+  let orders=DB.orders;
+  if(storeF) orders=orders.filter(o=>o.store===storeF);
+  if(monthF){
+    const [fy,fm]=monthF.split('-');
+    orders=orders.filter(o=>{const p=(o.data||'').split('/');return p.length===3&&p[2]===fy&&p[1]===fm;});
   }
-  document.getElementById('weeklyOut').innerHTML=html||'<div class="alert alert-info">Nessun DDT per questo store.</div>';
+  if(orders.length===0){document.getElementById('weeklyOut').innerHTML='<div class="alert alert-info">Nessun ordine nel periodo selezionato.</div>';return;}
+  function getWeekKey(data){
+    const p=data.split('/');if(p.length!==3) return 'x';
+    const d=parseInt(p[0]);const wk=d<=7?1:d<=14?2:d<=21?3:4;
+    return p[2]+'-'+p[1]+'-W'+wk;
+  }
+  function weekLabel(key){
+    const m=key.match(/(\d{4})-(\d{2})-W(\d)/);if(!m) return key;
+    const [,y,mo,wk]=m;const start=(parseInt(wk)-1)*7+1;
+    const daysInMonth=new Date(parseInt(y),parseInt(mo),0).getDate();
+    const end=Math.min(start+6,daysInMonth);
+    return MESI[parseInt(mo)]+' '+y+' — Settimana '+wk+' ('+String(start).padStart(2,'0')+'–'+String(end).padStart(2,'0')+')';
+  }
+  const weeks={};
+  for(const o of orders){
+    const wk=getWeekKey(o.data||'');
+    if(!weeks[wk]) weeks[wk]={label:weekLabel(wk),ordini:[],prods:{}};
+    weeks[wk].ordini.push(o.id);
+    for(const l of (o.lines||[])){
+      const desc=l.desc||l.descrizione||'';
+      const key=(l.cod||l.codice||'')+'::'+desc;
+      if(!weeks[wk].prods[key]) weeks[wk].prods[key]={desc,um:l.um||'',qtaTot:0,prezzi:[],importoTot:0,nd:0};
+      const p=weeks[wk].prods[key];
+      p.qtaTot+=l.qta||0;p.importoTot+=l.importo||0;p.nd++;
+      const pr=l.prezzoNetto||l.prezzo_netto||l.prezzo||0;
+      if(pr>0&&!p.prezzi.includes(pr)) p.prezzi.push(pr);
+    }
+  }
+  const wkColors=['var(--blue)','#2e7d32','#e65100','#6a1b9a'];
+  const sortedWks=Object.keys(weeks).sort();
+  let html='';
+  sortedWks.forEach(function(wkKey,wi){
+    const w=weeks[wkKey];
+    const prods=Object.values(w.prods).sort(function(a,b){return b.importoTot-a.importoTot;});
+    const total=prods.reduce(function(s,p){return s+(p.importoTot||0);},0);
+    const bg=wkColors[wi%wkColors.length];
+    let rows='';
+    prods.forEach(function(p,i){
+      const prezzoMedio=p.qtaTot>0?(p.importoTot/p.qtaTot):0;
+      const hasDivPrezzo=p.prezzi.length>1;
+      const rowStyle=hasDivPrezzo?'background:#fff8e1':'';
+      const prezziStr=hasDivPrezzo?('⚠️ prezzi diversi: '+p.prezzi.map(function(x){return '€'+x.toFixed(3);}).join(' / ')):'';
+      rows+='<tr style="'+rowStyle+'">'
+        +'<td class="tc muted">'+(i+1)+'</td>'
+        +'<td class="fb" style="font-size:11px">'+p.desc+'</td>'
+        +'<td class="tr mono fb">'+p.qtaTot.toFixed(0)+'</td>'
+        +'<td class="tc">'+p.um+'</td>'
+        +'<td class="tr mono">€'+prezzoMedio.toFixed(3)+'</td>'
+        +'<td class="tr mono fb">€'+p.importoTot.toFixed(2)+'</td>'
+        +'<td class="tc">'+p.nd+'</td>'
+        +'<td style="font-size:10px;max-width:200px">'+(prezziStr?'<span class="abadge a-warn" style="font-size:9px">'+prezziStr+'</span>':'')+'</td>'
+        +'</tr>';
+    });
+    html+='<div style="border-radius:10px;margin-bottom:18px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08)">'
+      +'<div style="background:'+bg+';color:#fff;padding:10px 16px;display:flex;justify-content:space-between;align-items:center">'
+      +'<span style="font-weight:700">'+w.label+'</span>'
+      +'<span style="font-size:11px">'+w.ordini.length+' ordini · '+prods.length+' prodotti · €'+total.toFixed(2)+'</span>'
+      +'</div>'
+      +'<div style="overflow-x:auto"><table class="dtable">'
+      +'<thead><tr><th>#</th><th>Prodotto</th><th class="tr">Qtà</th><th>UM</th><th class="tr">Pr. medio €</th><th class="tr">Tot. spesa €</th><th class="tc">Doc.</th><th>Note</th></tr></thead>'
+      +'<tbody>'+rows+'</tbody>'
+      +'<tfoot><tr><td colspan="5" class="tr fb">TOTALE — '+prods.length+' prodotti</td><td class="tr fb mono">€'+total.toFixed(2)+'</td><td colspan="2"></td></tr></tfoot>'
+      +'</table></div></div>';
+  });
+  document.getElementById('weeklyOut').innerHTML=html||'<div class="alert alert-info">Nessun dato.</div>';
 }
 
-// ANOMALIES
 function renderAnom(){
   const catF=document.getElementById('fAnomCat').value;
   const certF=document.getElementById('fAnomCert').value;
-  let filtered=DB.anomalies;
+  const allAnomalies=getAllAnomalies();
+  let filtered=allAnomalies;
   if(catF) filtered=filtered.filter(a=>a.cat===catF);
   if(certF) filtered=filtered.filter(a=>(a.cert||'').includes(certF));
-  if(filtered.length===0){document.getElementById('anomBody').innerHTML='<div class="alert alert-ok">✅ Nessuna anomalia rilevata.</div>';return;}
-  const cats=['PREZZO','QUANTITÀ','NOME PRODOTTO','DATI MANCANTI'];
+  const cats=['PREZZO','SCOSTAMENTO','AUMENTO','QUANTITÀ','NOME PRODOTTO','DATI MANCANTI'];
+  const catIcons={'PREZZO':'💰','SCOSTAMENTO':'📊','AUMENTO':'📈','QUANTITÀ':'📦','NOME PRODOTTO':'🏷️','DATI MANCANTI':'❓'};
   let html='';
   for(const cat of cats){
-    const items=filtered.filter(a=>a.cat===cat);if(items.length===0) continue;
-    const icon=cat==='PREZZO'?'💰':cat==='QUANTITÀ'?'📦':cat==='NOME PRODOTTO'?'🏷️':'❓';
-    html+=`<div class="section-hd mt14">${icon} ${cat} (${items.length})</div>`;
-    items.forEach(a=>{
+    const items=filtered.filter(a=>a.cat===cat);
+    if(items.length===0) continue;
+    html+=`<div class="section-hd mt14">${catIcons[cat]||'⚠️'} ${cat} (${items.length})</div>`;
+    items.forEach((a,ai)=>{
       html+=`<div style="padding:12px 0;border-bottom:1px solid #f0f1f3"><div class="flexb"><div>${certBadge(a.cert)} <span class="fb" style="margin-left:6px">#${a.n} — ${a.tipo||a.cat}</span></div>
-        <span class="muted" style="font-size:11px">${storePill(a.store)} · ${a.ordine}</span></div><div class="anom-detail">${(a.det||'').split('\n').join('\n')}</div></div>`;
+        <span class="muted" style="font-size:11px">${storePill(a.store)} · ${a.ordine}</span></div>
+        <div class="anom-detail">${(a.det||'').replace(/\n/g,'<br>')}</div></div>`;
     });
   }
-  document.getElementById('anomBody').innerHTML=html;
+  document.getElementById('anomBody').innerHTML=html||'<div class="alert alert-ok">✅ Nessuna anomalia trovata.</div>';
+  document.getElementById('verifList').innerHTML=(DB.verifications||[]).map(v=>`<li>${v}</li>`).join('');
+  const badge=document.getElementById('anomBadge');
+  if(badge) badge.textContent=allAnomalies.length;
 }
 
-// REFRESH
 function renderCredito(){
   const esito=(DB.note_credito||[]).find(l=>l.includes("ESITO VERIFICA"));
   const isOk=!esito||esito.includes("Nessuna");
@@ -1224,6 +1361,7 @@ function refreshAll(){saveDB();renderDashboard();renderAllOrders();renderAnom();
 // INIT
 function resetDB(){if(!confirm('⚠️ Vuoi cancellare tutti i dati e tornare ai valori iniziali?')) return;localStorage.removeItem(DB_KEY);location.reload();}
 function init(){
+  populateMonthSelector();
   renderDashboard();renderAllOrders();renderAnom();renderProds();renderCredito();renderListinoConcordato();
   // Carica da Supabase (sovrascrive localStorage se ci sono dati)
   sbLoadAll();
