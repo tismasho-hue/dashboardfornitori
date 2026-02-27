@@ -386,12 +386,23 @@ async function sbLoadAll(){
       SB('marr_products?select=*&order=id.asc').then(r=>r.json())
     ]);
     if(Array.isArray(ordR)&&ordR.length>0){
-      DB.orders=ordR.map(o=>({...o,lines:typeof o.lines==='string'?JSON.parse(o.lines):o.lines||[]}));
+      // Merge: parti dai locali, aggiorna/aggiungi con quelli Supabase
+      const localOrders=DB.orders||[];
+      const merged={};
+      for(const o of localOrders) merged[String(o.id)]=o;
+      for(const o of ordR){
+        merged[String(o.id)]={...o,lines:typeof o.lines==='string'?JSON.parse(o.lines):(o.lines||[])};
+      }
+      DB.orders=Object.values(merged).sort((a,b)=>{
+        const da=(a.data||'').split('/').reverse().join('');
+        const db=(b.data||'').split('/').reverse().join('');
+        return da.localeCompare(db);
+      });
       DB.anomalies=Array.isArray(anomR)?anomR.map(a=>({n:a.id,cat:a.cat,tipo:a.tipo,cert:a.cert,store:a.store,ordine:a.ordine,det:a.det})):[];
       DB.products=Array.isArray(prodR)?prodR.map(p=>({cod:p.cod,desc:p.descr,um:p.um,price:Number(p.price),iva:p.iva,updated:p.updated})):[];
       saveDBLocal();
       refreshAll();renderProds();
-      showStatus('✅ Dati caricati da Supabase','ok');
+      showStatus(`✅ ${DB.orders.length} ordini caricati`,'ok');
     } else if(Array.isArray(ordR)&&ordR.length===0){
       showStatus('☁️ Database Supabase vuoto — usa i dati locali','info');
     }
@@ -439,17 +450,24 @@ async function sbSyncAll(){
   showStatus('☁️ Salvataggio su Supabase...','info');
   try{
     const BATCH=20;
+    let saved=0;
     for(let i=0;i<DB.orders.length;i+=BATCH){
-      const batch=DB.orders.slice(i,i+BATCH).map(o=>{
-        const row={id:o.id,store:o.store,data:o.data,cons:o.cons,op:o.op||'',imp:o.imp,iva_v:o.iva_v,tot:o.tot,source:o.source||'pdf',pagamento:o.pagamento||'',lines:JSON.stringify(o.lines||[])};
-        if(o.omaggi!==undefined) row.omaggi=JSON.stringify(o.omaggi||[]);
-        if(o.trasp!==undefined) row.trasp=o.trasp||0;
-        return row;
-      });
-      await SB('marr_orders',{method:'POST',body:JSON.stringify(batch),headers:{'Prefer':'resolution=merge-duplicates,return=minimal'}});
+      const batch=DB.orders.slice(i,i+BATCH).map(o=>({
+        id:o.id,store:o.store,data:o.data,cons:o.cons,op:o.op||'',
+        imp:o.imp,iva_v:o.iva_v,tot:o.tot,source:o.source||'pdf',
+        pagamento:o.pagamento||'',lines:JSON.stringify(o.lines||[])
+      }));
+      const resp=await SB('marr_orders',{method:'POST',body:JSON.stringify(batch),headers:{'Prefer':'resolution=merge-duplicates,return=minimal'}});
+      if(!resp.ok){
+        const errText=await resp.text();
+        console.warn(`Batch ${i}-${i+BATCH} failed:`,resp.status,errText);
+        for(const o of DB.orders.slice(i,i+BATCH)){
+          try{ await sbSaveOrder(o); saved++; }catch(e2){ console.warn('Single save failed',o.id,e2); }
+        }
+      } else { saved+=batch.length; }
     }
     for(const p of DB.products) await sbSaveProduct(p);
-    showStatus('✅ Salvato su Supabase','ok');
+    showStatus(`✅ Salvati ${saved}/${DB.orders.length} ordini su Supabase`,'ok');
   }catch(e){
     console.warn('sbSyncAll failed',e);
     showStatus('⚠️ Errore Supabase — salvato localmente','warn');
