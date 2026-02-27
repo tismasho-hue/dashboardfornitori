@@ -1326,7 +1326,8 @@ function renderAnom(){
     });
   }
   document.getElementById('anomBody').innerHTML=html||'<div class="alert alert-ok">✅ Nessuna anomalia trovata.</div>';
-  document.getElementById('verifList').innerHTML=(DB.verifications||[]).map(v=>`<li>${v}</li>`).join('');
+  const verifEl=document.getElementById('verifList');
+  if(verifEl) verifEl.innerHTML=(DB.verifications||[]).map(v=>`<li>${v}</li>`).join('');
   const badge=document.getElementById('anomBadge');
   if(badge) badge.textContent=allAnomalies.length;
 }
