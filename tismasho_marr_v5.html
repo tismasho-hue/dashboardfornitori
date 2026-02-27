@@ -273,7 +273,8 @@ input:focus,select:focus{outline:none;border-color:var(--blue);background:#fff}
 <!-- ===== RIEPILOGO SETTIMANALE ===== -->
 <div id="page-settimane" class="page">
   <div class="filter-bar" style="margin-bottom:16px">
-    <select id="weekStore" onchange="renderWeekly()" style="min-width:200px"><option value="">Tutti gli store</option><option value="ALL">Tutti gli store</option><option value="TUSCOLANA">TUSCOLANA</option><option value="TRASTEVERE">TRASTEVERE</option><option value="PIAZZA ISTRIA">PIAZZA ISTRIA</option><option value="PONTE MILVIO">PONTE MILVIO</option></select>
+    <select id="weekStore" onchange="renderWeekly()" style="min-width:200px"><option value="">Tutti gli store</option><option value="TUSCOLANA">TUSCOLANA</option><option value="TRASTEVERE">TRASTEVERE</option><option value="PIAZZA ISTRIA">PIAZZA ISTRIA</option><option value="PONTE MILVIO">PONTE MILVIO</option></select>
+    <select id="monthSel" onchange="renderWeekly()" style="min-width:180px"><option value="">Tutti i mesi</option></select>
   </div>
   <div id="weeklyOut"></div>
 </div>
