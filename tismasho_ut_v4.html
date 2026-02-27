@@ -287,8 +287,8 @@ input:focus,select:focus{outline:none;border-color:var(--blue);background:#fff}
 <!-- ===== RIEPILOGO SETTIMANALE ===== -->
 <div id="page-settimane" class="page">
   <div class="filter-bar" style="margin-bottom:16px">
-    <select id="weekStore" onchange="renderWeekly()" style="min-width:200px"><option value="TRASTEVERE">TRASTEVERE</option><option value="PIAZZA ISTRIA">PIAZZA ISTRIA</option><option value="PONTE MILVIO">PONTE MILVIO</option><option value="TUSCOLANA">TUSCOLANA</option></select>
-    <select id="weekNum" onchange="renderWeekly()" style="min-width:180px"><option value="">Tutte le settimane</option><option value="0">Settimana 1 (01-07 feb)</option><option value="1">Settimana 2 (08-14 feb)</option><option value="2">Settimana 3 (15-21 feb)</option><option value="3">Settimana 4 (22-28 feb)</option></select>
+    <select id="weekStore" onchange="renderWeekly()" style="min-width:200px"><option value="">Tutti gli store</option><option value="TRASTEVERE">TRASTEVERE</option><option value="PIAZZA ISTRIA">PIAZZA ISTRIA</option><option value="PONTE MILVIO">PONTE MILVIO</option><option value="TUSCOLANA">TUSCOLANA</option></select>
+    <select id="monthSel" onchange="renderWeekly()" style="min-width:180px"><option value="">Tutti i mesi</option></select>
   </div>
   <div id="weeklyOut"></div>
 </div>
@@ -298,7 +298,7 @@ input:focus,select:focus{outline:none;border-color:var(--blue);background:#fff}
   <div class="card"><div class="card-head neutral flexb">
     <span>⚠️ Analisi anomalie — 434 righe · 47 ordini · 4 store</span>
     <div class="filter-bar">
-      <select id="fAnomCat" onchange="renderAnom()" style="min-width:140px"><option value="">Tutte</option><option>PREZZO</option><option>QUANTITÀ</option><option>NOME PRODOTTO</option><option>DATI MANCANTI</option></select>
+      <select id="fAnomCat" onchange="renderAnom()" style="min-width:140px"><option value="">Tutte</option><option>PREZZO</option><option>SCOSTAMENTO</option><option>QUANTITÀ</option><option>NOME PRODOTTO</option><option>DATI MANCANTI</option></select>
       <select id="fAnomCert" onchange="renderAnom()" style="min-width:140px"><option value="">Tutte</option><option value="CERTA">🔴 Certe</option><option value="DA VERIFICARE">🟡 Da verificare</option></select>
     </div>
   </div><div class="scroll-y" style="max-height:600px"><div id="anomBody" class="card-body"></div></div></div>
@@ -1112,6 +1112,40 @@ function showTab(id){
 
 // ============================================================
 // DASHBOARD RENDER
+// Helper: restituisce DB.anomalies + scostamenti calcolati al volo
+function getAllAnomalies(){
+  function getWkKey(data){
+    const p=(data||'').split('/');
+    if(p.length!==3) return 'x';
+    const d=parseInt(p[0]);
+    return p[2]+'-'+p[1]+'-W'+(d<=7?1:d<=14?2:d<=21?3:4);
+  }
+  const byPW={};
+  for(const o of DB.orders){
+    const wk=getWkKey(o.data);
+    for(const l of (o.lines||[])){
+      const desc=(l.desc||l.descrizione||'');
+      const key=desc+'::'+wk;
+      if(!byPW[key]) byPW[key]={desc,wk,store:o.store,ordini:[],prezzi:[]};
+      byPW[key].ordini.push(o.id);
+      const pr=l.prezzo_netto||l.prezzoNetto||l.prezzo||0;
+      if(pr>0&&!byPW[key].prezzi.includes(pr)) byPW[key].prezzi.push(pr);
+    }
+  }
+  const MESI=['','Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+  const scost=[];
+  let n=DB.anomalies.length+1;
+  for(const entry of Object.values(byPW)){
+    if(entry.prezzi.length<2) continue;
+    const m=entry.wk.match(/(\d{4})-(\d{2})-W(\d)/);
+    const wkLabel=m?(MESI[parseInt(m[2])]+' '+m[1]+' — Settimana '+m[3]):entry.wk;
+    scost.push({n:n++,cat:'SCOSTAMENTO',tipo:'Prezzi diversi nella stessa settimana',cert:'🟡 DA VERIFICARE',
+      store:entry.store,ordine:[...new Set(entry.ordini)].join(', '),
+      det:entry.desc+'\n'+wkLabel+'\nPrezzi rilevati: '+entry.prezzi.map(x=>'€'+x.toFixed(3)).join(' / ')+' | Scostamento: €'+(Math.max(...entry.prezzi)-Math.min(...entry.prezzi)).toFixed(3)});
+  }
+  return [...DB.anomalies,...scost];
+}
+
 function renderDashboard(){
   const totOrd=DB.orders.length;
   const totLines=DB.orders.reduce((s,o)=>s+(o.lines||[]).length,0);
@@ -1119,26 +1153,37 @@ function renderDashboard(){
   const totIva=DB.orders.reduce((s,o)=>s+(o.iva_v||0),0);
   const totTot=DB.orders.reduce((s,o)=>s+(o.tot||0),0);
   const pdfCount=DB.orders.filter(o=>o.source==='pdf').length;
+  const allAnoms=getAllAnomalies();
   document.getElementById('statsGrid').innerHTML=`
     <div class="stat"><div class="stat-lbl">Ordini totali</div><div class="stat-val">${totOrd}</div><div class="stat-sub">4 store · ${pdfCount} da PDF</div></div>
     <div class="stat b"><div class="stat-lbl">Righe prodotto</div><div class="stat-val">${totLines}</div><div class="stat-sub">media ${(totLines/totOrd).toFixed(1)}/ordine</div></div>
     <div class="stat"><div class="stat-lbl">Imponibile</div><div class="stat-val">€${fmt(totImp)}</div><div class="stat-sub">netto IVA</div></div>
-    <div class="stat o"><div class="stat-lbl">Anomalie</div><div class="stat-val">${DB.anomalies.length}</div><div class="stat-sub">${DB.anomalies.filter(a=>a.cert&&a.cert.includes('CERTA')).length} certe</div></div>
+    <div class="stat o"><div class="stat-lbl">Anomalie</div><div class="stat-val">${allAnoms.length}</div><div class="stat-sub">${allAnoms.filter(a=>a.cert&&a.cert.includes('CERTA')).length} certe</div></div>
     <div class="stat r"><div class="stat-lbl">Totale complessivo</div><div class="stat-val">€${fmt(totTot)}</div><div class="stat-sub">IVA inclusa</div></div>`;
-  // Riepilogo per store
-  const totComp=DB.riepilogo.find(r=>r.store.includes('TOTALE'));
-  const storeR=DB.riepilogo.filter(r=>!r.store.includes('TOTALE'));
+  // Riepilogo per store — calcolato dinamicamente dagli ordini reali
+  const storeNames=['TRASTEVERE','PIAZZA ISTRIA','PONTE MILVIO','TUSCOLANA'];
+  const storeR=storeNames.map(s=>{
+    const ords=DB.orders.filter(o=>o.store===s);
+    const imp=ords.reduce((sum,o)=>sum+(o.imp||0),0);
+    const iva=ords.reduce((sum,o)=>sum+(o.iva_v||0),0);
+    const tot=ords.reduce((sum,o)=>sum+(o.tot||0),0);
+    return {store:s,n_ordini:ords.length,imp,iva,tot};
+  }).filter(r=>r.n_ordini>0);
+  const totImpR=storeR.reduce((s,r)=>s+r.imp,0);
+  const totIvaR=storeR.reduce((s,r)=>s+r.iva,0);
+  const totTotR=storeR.reduce((s,r)=>s+r.tot,0);
+  const totOrdR=storeR.reduce((s,r)=>s+r.n_ordini,0);
   document.getElementById('riepilogoBody').innerHTML=storeR.map(r=>`<tr>
     <td>${storePill(r.store)}</td><td class="tc mono">${r.n_ordini}</td>
     <td class="tr mono">€${fmt(r.imp)}</td><td class="tr mono">€${fmt(r.iva)}</td>
-    <td class="tr mono fb">€${fmt(r.tot)}</td><td class="tr mono">${(r.tot/totComp.tot*100).toFixed(1)}%</td></tr>`).join('');
-  document.getElementById('riepilogoFoot').innerHTML=`<tr><td class="fb">TOTALE</td><td class="tc fb mono">${totComp.n_ordini}</td><td class="tr fb mono">€${fmt(totComp.imp)}</td><td class="tr fb mono">€${fmt(totComp.iva)}</td><td class="tr fb mono">€${fmt(totComp.tot)}</td><td class="tr fb mono">100%</td></tr>`;
+    <td class="tr mono fb">€${fmt(r.tot)}</td><td class="tr mono">${totTotR>0?(r.tot/totTotR*100).toFixed(1):0}%</td></tr>`).join('');
+  document.getElementById('riepilogoFoot').innerHTML=`<tr><td class="fb">TOTALE</td><td class="tc fb mono">${totOrdR}</td><td class="tr fb mono">€${fmt(totImpR)}</td><td class="tr fb mono">€${fmt(totIvaR)}</td><td class="tr fb mono">€${fmt(totTotR)}</td><td class="tr fb mono">100%</td></tr>`;
   // Anomalies summary
-  const certCount=DB.anomalies.filter(a=>a.cert&&a.cert.includes('CERTA')).length;
-  const verCount=DB.anomalies.filter(a=>a.cert&&a.cert.includes('VERIFICARE')).length;
+  const certCount=allAnoms.filter(a=>a.cert&&a.cert.includes('CERTA')).length;
+  const verCount=allAnoms.filter(a=>a.cert&&a.cert.includes('VERIFICARE')).length;
   let ah=`<div style="margin-bottom:12px"><span class="abadge a-certa">🔴 ${certCount} certe</span> &nbsp; <span class="abadge a-warn">🟡 ${verCount} da verificare</span></div>`;
-  DB.anomalies.slice(0,8).forEach(a=>{ah+=`<div style="padding:6px 0;border-bottom:1px solid #f0f1f3;font-size:11px">${certBadge(a.cert)} <span class="fb">${a.cat}</span> — ${(a.det||'').split('\n')[0].substring(0,80)}</div>`;});
-  ah+=`<div class="mt8"><button class="btn btn-ghost btn-sm" onclick="showTab('anomalie')">Tutte le ${DB.anomalies.length} anomalie →</button></div>`;
+  allAnoms.slice(0,8).forEach(a=>{ah+=`<div style="padding:6px 0;border-bottom:1px solid #f0f1f3;font-size:11px">${certBadge(a.cert)} <span class="fb">${a.cat}</span> — ${(a.det||'').split('\n')[0].substring(0,80)}</div>`;});
+  ah+=`<div class="mt8"><button class="btn btn-ghost btn-sm" onclick="showTab('anomalie')">Tutte le ${allAnoms.length} anomalie →</button></div>`;
   document.getElementById('dashAnom').innerHTML=ah;
   // Orders
   const sorted=[...DB.orders].sort((a,b)=>(b.data||'').localeCompare(a.data||''));
@@ -1146,7 +1191,7 @@ function renderDashboard(){
     <td class="fb mono">${o.id}</td><td>${storePill(o.store)}</td><td>${o.data}</td><td>${o.cons||'—'}</td><td>${o.op}</td><td class="tc">${(o.lines||[]).length}</td>
     <td class="tr mono">€${fmt(o.imp)}</td><td class="tr mono">€${fmt(o.iva_v)}</td><td class="tr mono fb">€${fmt(o.tot)}</td><td>${sourceBadge(o.source)}</td></tr>`).join('');
   document.getElementById('topbarInfo').textContent=`Uniontrade Spa · FEBBRAIO 2026 · ${totOrd} ordini · ${pdfCount} da PDF · 4 store`;
-  document.getElementById('anomBadge').textContent=DB.anomalies.length;
+  document.getElementById('anomBadge').textContent=allAnoms.length;
 }
 
 // ============================================================
@@ -1232,46 +1277,165 @@ function showOrderDetail(id){
 
 // ============================================================
 // WEEKLY
+function populateMonthSelector(){
+  const sel=document.getElementById('monthSel');
+  if(!sel) return;
+  const months=new Set();
+  for(const o of DB.orders){
+    const p=(o.data||'').split('/');
+    if(p.length===3) months.add(p[2]+'-'+p[1]);
+  }
+  const sorted=[...months].sort().reverse();
+  const MESI=['','Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+  const cur=sel.value;
+  sel.innerHTML='<option value="">Tutti i mesi</option>'+sorted.map(m=>{
+    const [y,mo]=m.split('-');
+    const label=MESI[parseInt(mo)]+' '+y;
+    return '<option value="'+m+'"'+(m===cur?' selected':'')+'>'+label+'</option>';
+  }).join('');
+}
+
 function renderWeekly(){
-  const store=document.getElementById('weekStore').value;
-  const weekIdx=document.getElementById('weekNum').value;
-  const weeks=DB.weekly[store]||[];
+  populateMonthSelector();
+  const storeF=document.getElementById('weekStore').value;
+  const monthF=document.getElementById('monthSel').value;
+  const MESI=['','Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+
+  let orders=DB.orders;
+  if(storeF) orders=orders.filter(function(o){return o.store===storeF;});
+  if(monthF){
+    const parts=monthF.split('-');
+    const fy=parts[0], fm=parts[1];
+    orders=orders.filter(function(o){
+      const p=(o.data||'').split('/');
+      return p.length===3&&p[2]===fy&&p[1]===fm;
+    });
+  }
+
+  if(orders.length===0){
+    document.getElementById('weeklyOut').innerHTML='<div class="alert alert-info">Nessun ordine nel periodo selezionato.</div>';
+    return;
+  }
+
+  function getWeekKey(data){
+    const p=data.split('/');
+    if(p.length!==3) return 'unknown';
+    const d=parseInt(p[0]);
+    const wk=d<=7?1:d<=14?2:d<=21?3:4;
+    return p[2]+'-'+p[1]+'-W'+wk;
+  }
+  function weekLabel(key){
+    const m=key.match(/(\d{4})-(\d{2})-W(\d)/);
+    if(!m) return key;
+    const y=m[1],mo=m[2],wk=m[3];
+    const start=(parseInt(wk)-1)*7+1;
+    const daysInMonth=new Date(parseInt(y),parseInt(mo),0).getDate();
+    const end=Math.min(start+6,daysInMonth);
+    return MESI[parseInt(mo)]+' '+y+' — Settimana '+wk+' ('+String(start).padStart(2,'0')+'–'+String(end).padStart(2,'0')+')';
+  }
+
+  // Aggrega per settimana
+  const weeks={};
+  for(const o of orders){
+    const wk=getWeekKey(o.data||'');
+    if(!weeks[wk]) weeks[wk]={label:weekLabel(wk),ordini:[],prods:{}};
+    weeks[wk].ordini.push(o.id);
+    for(const l of (o.lines||[])){
+      const desc=l.desc||l.descrizione||'';
+      const cod=l.codice||'';
+      const key=cod+'::'+desc;
+      if(!weeks[wk].prods[key]) weeks[wk].prods[key]={desc:desc,cod:cod,um:l.um||'',qtaTot:0,prezzi:[],importoTot:0,nd:0,ordiniConPrezzo:[]};
+      const p=weeks[wk].prods[key];
+      p.qtaTot+=l.qta||0;
+      p.importoTot+=l.importo||0;
+      p.nd++;
+      const pr=l.prezzo_netto||l.prezzoNetto||l.prezzo||0;
+      if(pr>0){
+        p.ordiniConPrezzo.push({prezzo:pr,ordine:o.id,store:o.store});
+        if(!p.prezzi.includes(pr)) p.prezzi.push(pr);
+      }
+    }
+  }
+
+  const wkColors=['var(--blue)','#2e7d32','#e65100','#6a1b9a'];
+  const sortedWks=Object.keys(weeks).sort();
   let html='';
-  const wkClasses=['wk1','wk2','wk3','wk4'];
-  weeks.forEach((w,idx)=>{
-    if(weekIdx!==''&&parseInt(weekIdx)!==idx) return;
-    const prods=w.products||[];
-    const total=prods.reduce((s,p)=>s+(p.tot||0),0);
-    html+=`<div class="wk-block ${wkClasses[idx]||'wk1'}"><div class="wk-head"><span>${w.header}</span>
-      <span style="font-size:11px">${w.orders_info?w.orders_info.substring(0,80):''} · ${prods.length} prodotti · €${fmt(total)}</span></div>
-      <div class="scroll-x"><table class="dtable"><thead><tr><th>#</th><th>Prodotto</th><th>Norm.</th><th class="tr">Qtà</th><th>UM</th><th class="tr">Pr. medio €</th><th class="tr">Tot. spesa €</th><th class="tc">Doc.</th><th>Note</th></tr></thead>
-      <tbody>${prods.map((p,i)=>{
-        const hasNote=p.note&&p.note.trim();
-        const noteStyle=hasNote&&p.note.includes('⚠')?'style="background:#fff8e1"':'';
-        return `<tr ${noteStyle}><td class="tc muted">${i+1}</td><td class="fb" style="font-size:11px">${p.desc}</td><td style="font-size:10px;color:var(--muted)">${p.norm||'—'}</td>
-          <td class="tr mono fb">${fmtI(p.qta)}</td><td class="tc">${p.um}</td><td class="tr mono">€${fmt(p.pm)}</td><td class="tr mono fb">€${fmt(p.tot)}</td><td class="tc">${p.nd}</td>
-          <td style="font-size:10px;max-width:200px">${hasNote?'<span class="abadge a-warn" style="font-size:9px">'+p.note+'</span>':''}</td></tr>`;
-      }).join('')}</tbody>
-      <tfoot><tr><td colspan="6" class="tr fb">TOTALE — ${prods.length} prodotti</td><td class="tr fb mono">€${fmt(total)}</td><td></td><td></td></tr></tfoot></table></div></div>`;
+  const newAnoms=[];
+
+  sortedWks.forEach(function(wkKey,wi){
+    const w=weeks[wkKey];
+    const prods=Object.values(w.prods).sort(function(a,b){return b.importoTot-a.importoTot;});
+    const total=prods.reduce(function(s,p){return s+(p.importoTot||0);},0);
+    const bg=wkColors[wi%wkColors.length];
+    let rows='';
+    prods.forEach(function(p,i){
+      const prezzoMedio=p.qtaTot>0?(p.importoTot/p.qtaTot):0;
+      const hasDivPrezzo=p.prezzi.length>1;
+      const rowStyle=hasDivPrezzo?'background:#fff8e1':'';
+      const prezziStr=hasDivPrezzo?('\u26a0\ufe0f prezzi diversi: '+p.prezzi.map(function(x){return '\u20ac'+x.toFixed(3);}).join(' / ')):'';
+      // Aggiungi anomalia scostamento
+      if(hasDivPrezzo){
+        const key='SCOST::'+p.desc+'::'+wkKey;
+        if(!newAnoms.find(function(a){return a._key===key;})){
+          newAnoms.push({
+            _key:key,
+            cat:'SCOSTAMENTO',
+            tipo:'Prezzi diversi nella stessa settimana',
+            cert:'\U0001f7e1 DA VERIFICARE',
+            store:storeF||'Multi-store',
+            ordine:w.ordini.join(', '),
+            det:p.desc+'\n'+w.label+'\nPrezzi rilevati: '+p.prezzi.map(function(x){return '\u20ac'+x.toFixed(3);}).join(' / ')+' | Scostamento: \u20ac'+(Math.max.apply(null,p.prezzi)-Math.min.apply(null,p.prezzi)).toFixed(3)
+          });
+        }
+      }
+      rows+='<tr style="'+rowStyle+'">'+
+        '<td class="tc muted">'+(i+1)+'</td>'+
+        '<td class="fb" style="font-size:11px">'+p.desc+'</td>'+
+        '<td class="tr mono fb">'+p.qtaTot.toFixed(0)+'</td>'+
+        '<td class="tc">'+p.um+'</td>'+
+        '<td class="tr mono">\u20ac'+prezzoMedio.toFixed(3)+'</td>'+
+        '<td class="tr mono fb">\u20ac'+p.importoTot.toFixed(2)+'</td>'+
+        '<td class="tc">'+p.nd+'</td>'+
+        '<td style="font-size:10px;max-width:200px">'+(prezziStr?'<span class="abadge a-warn" style="font-size:9px">'+prezziStr+'</span>':'')+'</td>'+
+        '</tr>';
+    });
+    html+='<div style="border-radius:10px;margin-bottom:18px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08)">'+
+      '<div style="background:'+bg+';color:#fff;padding:10px 16px;display:flex;justify-content:space-between;align-items:center">'+
+      '<span style="font-weight:700">'+w.label+'</span>'+
+      '<span style="font-size:11px">'+w.ordini.length+' ordini \u00b7 '+prods.length+' prodotti \u00b7 \u20ac'+total.toFixed(2)+'</span>'+
+      '</div>'+
+      '<div style="overflow-x:auto"><table class="dtable">'+
+      '<thead><tr><th>#</th><th>Prodotto</th><th class="tr">Qt\u00e0</th><th>UM</th><th class="tr">Pr. medio \u20ac</th><th class="tr">Tot. spesa \u20ac</th><th class="tc">Doc.</th><th>Note</th></tr></thead>'+
+      '<tbody>'+rows+'</tbody>'+
+      '<tfoot><tr><td colspan="5" class="tr fb">TOTALE \u2014 '+prods.length+' prodotti</td><td class="tr fb mono">\u20ac'+total.toFixed(2)+'</td><td colspan="2"></td></tr></tfoot>'+
+      '</table></div></div>';
   });
+
+  // Gli scostamenti NON vengono salvati in DB.anomalies — vengono calcolati al volo in renderAnom
+
   document.getElementById('weeklyOut').innerHTML=html||'<div class="alert alert-info">Nessun dato.</div>';
 }
+
+
 
 // ============================================================
 // ANOMALIES
 function renderAnom(){
   const catF=document.getElementById('fAnomCat').value;
   const certF=document.getElementById('fAnomCert').value;
-  let filtered=DB.anomalies;
+
+  const allAnomalies=getAllAnomalies();
+  let filtered=allAnomalies;
   if(catF) filtered=filtered.filter(a=>a.cat===catF);
   if(certF) filtered=filtered.filter(a=>a.cert&&a.cert.includes(certF));
-  const cats=['PREZZO','QUANTITÀ','NOME PRODOTTO','DATI MANCANTI'];
+
+  const cats=['PREZZO','SCOSTAMENTO','QUANTITÀ','NOME PRODOTTO','DATI MANCANTI'];
+  const catIcons={'PREZZO':'💰','SCOSTAMENTO':'📊','QUANTITÀ':'📦','NOME PRODOTTO':'🏷️','DATI MANCANTI':'❓'};
   let html='';
   for(const cat of cats){
     const items=filtered.filter(a=>a.cat===cat);
     if(items.length===0) continue;
-    const catIcon=cat==='PREZZO'?'💰':cat==='QUANTITÀ'?'📦':cat==='NOME PRODOTTO'?'🏷️':'❓';
-    html+=`<div class="section-hd mt14">${catIcon} ${cat} (${items.length})</div>`;
+    html+=`<div class="section-hd mt14">${catIcons[cat]||'⚠️'} ${cat} (${items.length})</div>`;
     items.forEach(a=>{
       const detLines=(a.det||'').split('\n');
       html+=`<div style="padding:12px 0;border-bottom:1px solid #f0f1f3"><div class="flexb"><div>${certBadge(a.cert)} <span class="fb" style="margin-left:6px">#${a.n} — ${a.tipo||a.cat}</span></div>
@@ -1280,6 +1444,8 @@ function renderAnom(){
   }
   document.getElementById('anomBody').innerHTML=html||'<div class="alert alert-info">Nessuna anomalia.</div>';
   document.getElementById('verifList').innerHTML=DB.verifications.map(v=>`<li>${v.replace('✅ ','').replace('• ','')}</li>`).join('');
+  const badge=document.getElementById('anomBadge');
+  if(badge) badge.textContent=allAnomalies.length;
 }
 
 // ============================================================
@@ -1343,6 +1509,10 @@ function refreshAll(){
   renderDashboard();
   renderAllOrders();
   renderAnom();
+  populateMonthSelector();
+  // Aggiorna riepilogo settimanale solo se la tab è visibile
+  const settPage = document.getElementById('page-settimane');
+  if(settPage && settPage.style.display !== 'none') renderWeekly();
 }
 
 // ============================================================
@@ -1351,6 +1521,7 @@ function resetDB(){if(!confirm('⚠️ Vuoi cancellare tutti i dati e tornare ai
 function init(){
   const ops=[...new Set(DB.orders.map(o=>o.op).filter(Boolean))].sort();
   document.getElementById('filterOrdOp').innerHTML='<option value="">Tutti gli operatori</option>'+ops.map(op=>`<option>${op}</option>`).join('');
+  populateMonthSelector();
   renderDashboard();
   renderAllOrders();
   renderAnom();
