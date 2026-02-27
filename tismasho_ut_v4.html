@@ -1,0 +1,1336 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TISMASHO — Dashboard + Gestione Fatture PDF</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+// Fix worker - must be set before any pdf.js call
+if(typeof pdfjsLib !== 'undefined') {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+</script>
+<style>
+:root {
+  --green:#1a6b3c; --green-light:#e8f5e9; --green-mid:#4caf50;
+  --blue:#1a3a5c; --blue-light:#e3edf7; --blue-mid:#2980b9;
+  --orange:#e67e22; --red:#c0392b; --red-light:#fce4e4;
+  --yellow:#fff8e1; --gray:#f5f6f8; --border:#dde1e6;
+  --text:#1c1c1e; --muted:#6c757d; --white:#ffffff;
+  --shadow:0 1px 4px rgba(0,0,0,0.06),0 2px 12px rgba(0,0,0,0.04);
+  --radius:10px;
+  --font:'DM Sans',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);font-size:13px;background:var(--gray);color:var(--text);min-height:100vh}
+.topbar{background:linear-gradient(135deg,#1a6b3c 0%,#145a32 100%);color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 28px;height:56px;box-shadow:0 2px 12px rgba(0,0,0,.15)}
+.topbar-brand{display:flex;align-items:center;gap:14px}
+.topbar-brand h1{font-size:17px;font-weight:700;letter-spacing:-.3px}
+.topbar-brand span{font-size:11px;opacity:.7}
+.topbar-actions{display:flex;gap:10px;align-items:center}
+.tabs{background:var(--blue);display:flex;padding:0 28px;overflow-x:auto;gap:2px}
+.tab{padding:12px 20px;color:rgba(255,255,255,.6);cursor:pointer;font-size:12px;font-weight:600;border-bottom:3px solid transparent;white-space:nowrap;transition:all .2s;letter-spacing:.2px}
+.tab:hover{color:#fff;background:rgba(255,255,255,.06)}
+.tab.active{color:#fff;border-bottom-color:var(--orange)}
+.badge{background:var(--red);color:#fff;border-radius:9px;padding:1px 6px;font-size:10px;margin-left:5px;font-weight:700}
+.page{display:none;padding:24px 28px;max-width:1440px;margin:0 auto}
+.page.active{display:block}
+.card{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:18px;overflow:hidden;border:1px solid var(--border)}
+.card-head{padding:13px 20px;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:space-between;letter-spacing:.2px;border-bottom:1px solid var(--border)}
+.card-head.blue{background:var(--blue);color:#fff;border:none}
+.card-head.green{background:var(--green);color:#fff;border:none}
+.card-head.orange{background:#c0392b;color:#fff;border:none}
+.card-head.neutral{background:#f8f9fa;color:var(--text)}
+.card-body{padding:20px}
+.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:18px}
+.stat{background:var(--white);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow);border:1px solid var(--border);border-top:3px solid var(--green-mid);transition:transform .15s}
+.stat:hover{transform:translateY(-2px)}
+.stat.b{border-top-color:var(--blue-mid)}.stat.o{border-top-color:var(--orange)}.stat.r{border-top-color:var(--red)}.stat.y{border-top-color:#f1c40f}
+.stat-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:700;letter-spacing:.5px;margin-bottom:6px}
+.stat-val{font-size:24px;font-weight:700;color:var(--blue);font-family:var(--mono)}
+.stat-sub{font-size:10px;color:var(--muted);margin-top:4px}
+.btn{display:inline-flex;align-items:center;gap:5px;padding:8px 16px;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:600;transition:all .15s;font-family:var(--font)}
+.btn-green{background:var(--green);color:#fff}.btn-green:hover{background:#145a32}
+.btn-blue{background:var(--blue);color:#fff}.btn-blue:hover{background:#122d47}
+.btn-orange{background:var(--orange);color:#fff}.btn-orange:hover{background:#d35400}
+.btn-ghost{background:transparent;color:var(--blue);border:1.5px solid var(--border)}.btn-ghost:hover{background:var(--blue-light)}
+.btn-red{background:var(--red);color:#fff}.btn-red:hover{background:#a93226}
+.btn-sm{padding:5px 10px;font-size:11px}
+.dtable{width:100%;border-collapse:collapse;font-size:12px}
+.dtable th{background:#f8f9fa;color:var(--text);padding:10px 12px;font-size:11px;text-align:left;white-space:nowrap;border-bottom:2px solid var(--border);font-weight:700;text-transform:uppercase;letter-spacing:.3px;position:sticky;top:0;z-index:1}
+.dtable td{padding:9px 12px;border-bottom:1px solid #f0f1f3;vertical-align:middle}
+.dtable tr:hover td{background:#f8fafe}
+.dtable tfoot td{background:#f8f9fa;font-weight:700;border-top:2px solid var(--border)}
+.dtable.green th{background:var(--green);color:#fff}
+.dtable.blue th{background:var(--blue);color:#fff}
+.pill{display:inline-block;padding:3px 10px;border-radius:12px;font-size:10px;font-weight:700;letter-spacing:.2px}
+.pTRASTEVERE{background:#dce6f1;color:#1f4e79}.pPIAZZA{background:#e2efda;color:#375623}.pPONTE{background:#fce4d6;color:#7b3f00}.pTUSCOLANA{background:#ede7f6;color:#4b0082}
+.alert{padding:12px 16px;border-radius:8px;margin-bottom:14px;font-size:12px;display:flex;align-items:flex-start;gap:8px;line-height:1.5}
+.alert-info{background:var(--blue-light);color:var(--blue);border:1px solid #b8d4f0}
+.alert-ok{background:var(--green-light);color:#1a5c2e;border:1px solid #a5d6a7}
+.alert-warn{background:var(--yellow);color:#7b5c00;border:1px solid #f0d68a}
+.alert-err{background:var(--red-light);color:var(--red);border:1px solid #e8a0a0}
+.abadge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:12px;font-size:10px;font-weight:700}
+.a-certa{background:var(--red-light);color:var(--red)}.a-warn{background:var(--yellow);color:#7b5c00}.a-ok{background:var(--green-light);color:var(--green)}
+.tr{text-align:right}.tc{text-align:center}.fb{font-weight:700}
+.muted{color:var(--muted)}.gap8{gap:8px}
+.flex{display:flex}.flexb{display:flex;justify-content:space-between;align-items:center}
+.mt8{margin-top:8px}.mt14{margin-top:14px}.mt20{margin-top:20px}
+.scroll-x{overflow-x:auto}.scroll-y{overflow-y:auto}
+.divider{height:1px;background:var(--border);margin:16px 0}
+.section-hd{font-size:14px;font-weight:700;color:var(--blue);margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid var(--blue-light)}
+.mono{font-family:var(--mono)}
+.wk-block{margin-bottom:20px;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.wk-head{padding:10px 16px;font-weight:700;font-size:12px;display:flex;justify-content:space-between;align-items:center}
+.wk1 .wk-head{background:#dce6f1;color:#1f4e79}.wk2 .wk-head{background:#fce4d6;color:#7b3f00}.wk3 .wk-head{background:#e2efda;color:#375623}.wk4 .wk-head{background:#fff2cc;color:#7b5c00}
+.expand-btn{cursor:pointer;user-select:none}.expand-content{display:none}.expand-content.open{display:block}
+.anom-detail{background:#fafafa;border-radius:6px;padding:10px 14px;margin-top:6px;font-size:11px;line-height:1.6;white-space:pre-wrap;color:#555}
+.filter-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.filter-bar select,.filter-bar input{padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;font-family:var(--font);background:#fff}
+.filter-bar select:focus,.filter-bar input:focus{outline:none;border-color:var(--blue)}
+.vlist{list-style:none;padding:0}.vlist li{padding:6px 0;font-size:12px;color:#2e7d32;display:flex;align-items:flex-start;gap:6px}.vlist li::before{content:'✅';flex-shrink:0}
+.nc-item{padding:8px 12px;border-left:3px solid var(--green-mid);margin-bottom:8px;background:#f9faf9;border-radius:0 6px 6px 0;font-size:12px}
+
+/* UPLOAD SPECIFIC */
+.dropzone{border:2.5px dashed var(--border);border-radius:var(--radius);padding:40px 20px;text-align:center;cursor:pointer;transition:all .2s;background:#fafafa;position:relative}
+.dropzone:hover,.dropzone.drag{border-color:var(--blue);background:var(--blue-light)}
+.dropzone.success{border-color:var(--green);background:var(--green-light)}
+.dropzone.error{border-color:var(--red);background:var(--red-light)}
+.dz-icon{font-size:44px;margin-bottom:10px;display:block}
+.dz-title{font-size:15px;font-weight:700;color:var(--blue);margin-bottom:6px}
+.dz-sub{font-size:11px;color:var(--muted)}.dz-file{font-size:12px;color:var(--green);font-weight:700;margin-top:6px}
+.prog-wrap{margin-top:14px;display:none}
+.prog-label{font-size:12px;font-weight:600;color:var(--blue);margin-bottom:5px}
+.prog-bar{height:7px;background:var(--border);border-radius:4px;overflow:hidden}
+.prog-fill{height:100%;background:var(--green);border-radius:4px;transition:width .35s}
+.steps{display:flex;gap:0;margin-bottom:20px}
+.step{flex:1;padding:10px 16px;background:#fff;border:1.5px solid var(--border);font-size:11px;font-weight:600;color:var(--muted);display:flex;align-items:center;gap:8px;border-right:none;position:relative}
+.step:last-child{border-right:1.5px solid var(--border);border-radius:0 6px 6px 0}
+.step:first-child{border-radius:6px 0 0 6px}
+.step.done{background:var(--green-light);border-color:var(--green-mid);color:var(--green)}
+.step.active{background:var(--blue-light);border-color:var(--blue);color:var(--blue)}
+.step-num{width:22px;height:22px;border-radius:50%;background:var(--border);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.step.done .step-num{background:var(--green)}.step.active .step-num{background:var(--blue)}
+.ptable{width:100%;border-collapse:collapse;font-size:12px}
+.ptable th{background:var(--blue);color:#fff;padding:8px 10px;font-size:11px;text-align:left;white-space:nowrap}
+.ptable td{padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
+.ptable tr:nth-child(even) td{background:#fafafa}
+.ptable tr:last-child td{background:#f0f4f0;font-weight:700}
+.ptable input{padding:4px 6px;font-size:11px;width:100%;border:1.5px solid var(--border);border-radius:4px;font-family:var(--font)}
+.frow{display:grid;gap:10px;margin-bottom:10px}
+.c2{grid-template-columns:1fr 1fr}.c3{grid-template-columns:1fr 1fr 1fr}.c4{grid-template-columns:1fr 1fr 1fr 1fr}
+label{display:block;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px}
+input,select{width:100%;padding:7px 9px;border:1.5px solid var(--border);border-radius:4px;font-size:12px;font-family:var(--font);background:#fafafa;transition:border .15s}
+input:focus,select:focus{outline:none;border-color:var(--blue);background:#fff}
+/* MODAL */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;display:none;align-items:center;justify-content:center}
+.modal-bg.open{display:flex}
+.modal{background:#fff;border-radius:10px;padding:24px;max-width:560px;width:92%;box-shadow:0 8px 32px rgba(0,0,0,.22);max-height:90vh;overflow-y:auto}
+.modal h3{font-size:15px;color:var(--blue);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.modal-foot{margin-top:18px;display:flex;justify-content:flex-end;gap:10px}
+@media(max-width:1100px){.stats{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:768px){.stats{grid-template-columns:1fr 1fr}.filter-bar{flex-direction:column}.c4,.c3{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-brand"><div>
+    <h1>🍔 TISMASHO — Dashboard + Gestione Fatture</h1>
+    <span id="topbarInfo">Uniontrade Spa · FEBBRAIO 2026 · 47 ordini · 4 store</span>
+  </div></div>
+  <div class="topbar-actions">
+    <span id="syncStatus" style="font-size:10px;display:none"></span>
+    <button class="btn btn-orange btn-sm" onclick="exportExcel()">⬇ Esporta Excel</button>
+    <button class="btn btn-sm" style="background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.4);font-size:11px" onclick="saveDB();alert('✅ Dati salvati!')">💾 Salva</button>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('dashboard')">📊 Dashboard</div>
+  <div class="tab" onclick="showTab('carica')">📄 Carica PDF</div>
+  <div class="tab" onclick="showTab('store')">🏪 Dettaglio Store</div>
+  <div class="tab" onclick="showTab('ordini')">📋 Tutti gli Ordini</div>
+  <div class="tab" onclick="showTab('settimane')">📅 Riepilogo Settimanale</div>
+  <div class="tab" onclick="showTab('anomalie')">⚠️ Anomalie <span class="badge" id="anomBadge">19</span></div>
+  <div class="tab" onclick="showTab('credito')">📝 Note di Credito</div>
+  <div class="tab" onclick="showTab('listino_concordato')">📋 Listino Concordato</div>
+  <div class="tab" onclick="showTab('listino')">⚙ Anagrafica Prodotti</div>
+</div>
+
+<!-- ===== DASHBOARD ===== -->
+<div id="page-dashboard" class="page active">
+  <div class="stats" id="statsGrid"></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
+    <div class="card"><div class="card-head green">📊 Riepilogo per Store</div>
+      <div class="scroll-x"><table class="dtable green"><thead><tr><th>Store</th><th>N° Ordini</th><th class="tr">Imponibile €</th><th class="tr">IVA €</th><th class="tr">Totale €</th><th class="tr">%</th></tr></thead><tbody id="riepilogoBody"></tbody><tfoot id="riepilogoFoot"></tfoot></table></div>
+    </div>
+    <div class="card"><div class="card-head orange">⚠️ Anomalie — Sintesi</div><div class="card-body" id="dashAnom" style="max-height:320px;overflow-y:auto"></div></div>
+  </div>
+  <div class="card"><div class="card-head blue">📋 Ultimi ordini</div>
+    <div class="scroll-x" style="max-height:400px;overflow-y:auto"><table class="dtable blue"><thead><tr><th>N° Ordine</th><th>Store</th><th>Data</th><th>Consegna</th><th>Operatore</th><th>Righe</th><th class="tr">Imp. €</th><th class="tr">IVA €</th><th class="tr">Tot. €</th><th>Fonte</th></tr></thead><tbody id="dashOrders"></tbody></table></div>
+  </div>
+</div>
+
+<!-- ===== CARICA PDF ===== -->
+<div id="page-carica" class="page">
+  <div class="steps">
+    <div class="step active" id="st1"><div class="step-num">1</div>Carica PDF</div>
+    <div class="step" id="st2"><div class="step-num">2</div>Verifica dati</div>
+    <div class="step" id="st3"><div class="step-num">3</div>Conferma e salva</div>
+  </div>
+  <div id="step1Block">
+    <div class="card"><div class="card-head blue">📁 Trascina o seleziona il PDF fattura</div>
+      <div class="card-body">
+        <div class="alert alert-info">ℹ️ Formato supportato: <strong>PROFORMA Uniontrade Spa</strong> — layout fisso — un PDF = una fattura. Il parser legge automaticamente tutti i campi.</div>
+        <div class="dropzone" id="dz" onclick="document.getElementById('pdfInput').click()" ondragover="dzOver(event)" ondragleave="dzLeave()" ondrop="dzDrop(event)">
+          <span class="dz-icon">📄</span>
+          <div class="dz-title">Clicca qui o trascina il PDF</div>
+          <div class="dz-sub">File .pdf · Fattura PROFORMA Uniontrade</div>
+          <div class="dz-file" id="dzFileName"></div>
+        </div>
+        <input type="file" id="pdfInput" accept=".pdf" style="display:none" onchange="loadPDF(event)">
+        <div class="prog-wrap" id="progWrap"><div class="prog-label" id="progLabel">Lettura PDF...</div><div class="prog-bar"><div class="prog-fill" id="progFill" style="width:0%"></div></div></div>
+        <div id="parseError"></div>
+        <div id="debugPanel" style="display:none;margin-top:10px">
+          <div class="flexb" style="margin-bottom:6px">
+            <span style="font-size:11px;font-weight:700;color:var(--muted)">🔍 DEBUG — Testo grezzo estratto dal PDF</span>
+            <button class="btn btn-ghost btn-sm" onclick="document.getElementById('debugPanel').style.display='none'">✕ Chiudi</button>
+          </div>
+          <textarea id="debugText" style="width:100%;height:220px;font-family:monospace;font-size:11px;border:1.5px solid var(--border);border-radius:6px;padding:8px;background:#f8f9fa;resize:vertical" readonly></textarea>
+        </div>
+        <div class="divider"></div>
+        <div class="flexb"><span style="font-size:11px;font-weight:700;color:var(--muted)">📦 IMPORTAZIONE MULTIPLA</span>
+          <button class="btn btn-ghost btn-sm" onclick="document.getElementById('pdfMulti').click()">+ Seleziona più PDF</button>
+        </div>
+        <input type="file" id="pdfMulti" accept=".pdf" multiple style="display:none" onchange="loadMulti(event)">
+        <div id="multiQueue" style="margin-top:10px"></div>
+      </div>
+    </div>
+  </div>
+  <div id="step2Block" style="display:none">
+    <div class="card"><div class="card-head green flexb" id="step2Head">
+        <span>✅ Dati estratti — Verifica e correggi</span>
+        <button class="btn btn-ghost btn-sm" style="color:#fff;border-color:rgba(255,255,255,.5)" onclick="backToStep1()">← Carica altro PDF</button>
+      </div>
+      <div class="card-body">
+        <div class="frow c4">
+          <div><label>N° Ordine</label><input id="prev_num" type="text"></div>
+          <div><label>Store</label><select id="prev_store"><option>TRASTEVERE</option><option>PIAZZA ISTRIA</option><option>PONTE MILVIO</option><option>TUSCOLANA</option></select></div>
+          <div><label>Data Ordine</label><input id="prev_data" type="text" placeholder="dd/mm/yyyy"></div>
+          <div><label>Data Consegna</label><input id="prev_cons" type="text" placeholder="dd/mm/yyyy"></div>
+        </div>
+        <div class="frow c2">
+          <div><label>Operatore</label><input id="prev_op" type="text"></div>
+          <div><label>Pagamento</label><input id="prev_pag" type="text"></div>
+        </div>
+        <div class="divider"></div>
+        <div class="section-hd">Righe articolo</div>
+        <div style="overflow-x:auto"><table class="ptable">
+          <thead><tr><th>#</th><th>Codice</th><th>Descrizione</th><th>UM</th><th>Qtà</th><th>Prezzo netto €</th><th>IVA %</th><th>Importo €</th><th></th></tr></thead>
+          <tbody id="prevRows"></tbody>
+          <tfoot><tr><td colspan="7" style="padding:8px 10px;font-size:11px">TOTALE IMPONIBILE</td><td id="prevTotImp" style="padding:8px 10px;font-weight:700;text-align:right"></td><td></td></tr></tfoot>
+        </table></div>
+        <div class="mt8 flex gap8" style="justify-content:flex-end"><button class="btn btn-ghost btn-sm" onclick="addPrevRow()">+ Aggiungi riga</button></div>
+      </div>
+    </div>
+    <div id="anomalyCheck"></div>
+    <div class="card"><div class="card-body flexb">
+      <div id="prevTotals" style="font-size:13px"></div>
+      <div class="flex gap8"><button class="btn btn-ghost" onclick="backToStep1()">← Annulla</button><button class="btn btn-green" onclick="confirmSave()">✅ Conferma e salva</button></div>
+    </div></div>
+  </div>
+  <div id="step3Block" style="display:none">
+    <div class="card"><div class="card-head green">🎉 Ordine salvato con successo</div>
+      <div class="card-body"><div id="saveConfirmMsg"></div>
+        <div class="mt14 flex gap8">
+          <button class="btn btn-green" onclick="backToStep1()">📄 Carica nuovo PDF</button>
+          <button class="btn btn-blue" onclick="exportExcel()">⬇ Esporta Excel</button>
+          <button class="btn btn-ghost" onclick="showTab('ordini')">📋 Vedi ordini</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== DETTAGLIO STORE ===== -->
+<div id="page-store" class="page">
+  <div class="filter-bar" style="margin-bottom:16px"><select id="storeFilter" onchange="renderStoreDetail()" style="min-width:200px">
+    <option value="TRASTEVERE">TRASTEVERE</option><option value="PIAZZA ISTRIA">PIAZZA ISTRIA</option><option value="PONTE MILVIO">PONTE MILVIO</option><option value="TUSCOLANA">TUSCOLANA</option>
+  </select></div>
+  <div id="storeDetailOut"></div>
+</div>
+
+<!-- ===== TUTTI GLI ORDINI ===== -->
+<div id="page-ordini" class="page">
+  <div class="card"><div class="card-head neutral flexb">
+    <span>📋 Storico ordini completo</span>
+    <div class="filter-bar">
+      <input id="searchOrd" type="text" placeholder="🔍 cerca..." style="width:160px" oninput="renderAllOrders()">
+      <select id="filterOrdStore" onchange="renderAllOrders()" style="width:150px"><option value="">Tutti gli store</option><option>TRASTEVERE</option><option>PIAZZA ISTRIA</option><option>PONTE MILVIO</option><option>TUSCOLANA</option></select>
+      <select id="filterOrdOp" onchange="renderAllOrders()" style="width:160px"><option value="">Tutti gli operatori</option></select>
+      <select id="filterOrdSource" onchange="renderAllOrders()" style="width:130px"><option value="">Tutte le fonti</option><option value="pdf">PDF</option><option value="storico">Storico</option></select>
+    </div>
+  </div>
+  <div class="scroll-y" style="max-height:600px"><table class="dtable blue">
+    <thead><tr><th>N° Ordine</th><th>Store</th><th>Data</th><th>Cons.</th><th>Operatore</th><th>Righe</th><th class="tr">Imp. €</th><th class="tr">IVA €</th><th class="tr">Tot. €</th><th>Fonte</th><th></th></tr></thead>
+    <tbody id="ordersBody"></tbody>
+    <tfoot><tr id="ordersFoot"><td colspan="11"></td></tr></tfoot>
+  </table></div></div>
+  <div id="orderDetail"></div>
+</div>
+
+<!-- ===== RIEPILOGO SETTIMANALE ===== -->
+<div id="page-settimane" class="page">
+  <div class="filter-bar" style="margin-bottom:16px">
+    <select id="weekStore" onchange="renderWeekly()" style="min-width:200px"><option value="TRASTEVERE">TRASTEVERE</option><option value="PIAZZA ISTRIA">PIAZZA ISTRIA</option><option value="PONTE MILVIO">PONTE MILVIO</option><option value="TUSCOLANA">TUSCOLANA</option></select>
+    <select id="weekNum" onchange="renderWeekly()" style="min-width:180px"><option value="">Tutte le settimane</option><option value="0">Settimana 1 (01-07 feb)</option><option value="1">Settimana 2 (08-14 feb)</option><option value="2">Settimana 3 (15-21 feb)</option><option value="3">Settimana 4 (22-28 feb)</option></select>
+  </div>
+  <div id="weeklyOut"></div>
+</div>
+
+<!-- ===== ANOMALIE ===== -->
+<div id="page-anomalie" class="page">
+  <div class="card"><div class="card-head neutral flexb">
+    <span>⚠️ Analisi anomalie — 434 righe · 47 ordini · 4 store</span>
+    <div class="filter-bar">
+      <select id="fAnomCat" onchange="renderAnom()" style="min-width:140px"><option value="">Tutte</option><option>PREZZO</option><option>QUANTITÀ</option><option>NOME PRODOTTO</option><option>DATI MANCANTI</option></select>
+      <select id="fAnomCert" onchange="renderAnom()" style="min-width:140px"><option value="">Tutte</option><option value="CERTA">🔴 Certe</option><option value="DA VERIFICARE">🟡 Da verificare</option></select>
+    </div>
+  </div><div class="scroll-y" style="max-height:600px"><div id="anomBody" class="card-body"></div></div></div>
+  <div class="card mt20"><div class="card-head green">✅ Verifiche con esito positivo</div><div class="card-body"><ul class="vlist" id="verifList"></ul></div></div>
+</div>
+
+<!-- ===== NOTE DI CREDITO ===== -->
+<div id="page-credito" class="page">
+  <div class="card"><div class="card-head green">📝 Note di Credito — Febbraio 2026</div><div class="card-body" id="creditoBody"></div></div>
+</div>
+
+<!-- ===== LISTINO CONCORDATO ===== -->
+<div id="page-listino_concordato" class="page">
+  <div class="card">
+    <div class="card-head blue flexb">
+      <span>📋 Listino Concordato Uniontrade — prezzi di riferimento (23 prodotti)</span>
+      <input id="searchLC" type="text" placeholder="🔍 cerca..." style="width:180px;padding:5px 10px;border:1px solid rgba(255,255,255,.3);border-radius:5px;background:rgba(255,255,255,.15);color:#fff;font-size:12px" oninput="renderListinoConcordato()">
+    </div>
+    <div class="scroll-y" style="max-height:580px">
+      <table class="dtable blue">
+        <thead><tr><th>Codice</th><th>Descrizione</th><th>UM</th><th class="tr">Prezzo €</th><th>IVA %</th><th class="tr">Scostamenti rilevati</th></tr></thead>
+        <tbody id="listinoBody"></tbody>
+      </table>
+    </div>
+    <div class="card-body" style="border-top:1px solid var(--border);padding:10px 18px">
+      <span class="muted" style="font-size:11px">💡 Prezzi di riferimento concordati con Uniontrade. Qualsiasi ordine con prezzo diverso da quello concordato viene segnalato come <strong>anomalia PREZZO</strong>.</span>
+    </div>
+  </div>
+</div>
+
+<!-- ===== LISTINO ===== -->
+<div id="page-listino" class="page">
+  <div class="card"><div class="card-head neutral flexb">
+    <span>🗂 Anagrafica Prodotti — storico prezzi da ordini</span>
+    <button class="btn btn-green btn-sm" onclick="openProdModal()">+ Nuovo prodotto</button>
+  </div>
+  <div class="scroll-y" style="max-height:520px"><table class="dtable"><thead><tr><th>#</th><th>Codice</th><th>Descrizione</th><th>UM</th><th class="tr">Prezzo €</th><th>IVA %</th><th></th></tr></thead><tbody id="prodBody"></tbody></table></div>
+  <div class="card-body" style="border-top:1px solid var(--border);padding:10px 18px"><span class="muted" style="font-size:11px">💡 Anagrafica aggiornata automaticamente ad ogni ordine importato. Il prezzo di riferimento per le anomalie è il <strong>Listino Concordato</strong>.</span></div></div>
+</div>
+
+<!-- MODAL prodotto -->
+<div class="modal-bg" id="prodModal"><div class="modal">
+  <h3>➕ Aggiungi/modifica prodotto</h3>
+  <input type="hidden" id="mp_idx">
+  <div class="frow c2">
+    <div style="grid-column:1/-1"><label>Codice</label><input id="mp_cod" placeholder="es. USMA01A"></div>
+    <div style="grid-column:1/-1"><label>Descrizione *</label><input id="mp_desc" placeholder="es. SMASH BURGER B.A 90GR GELO 1X9KG"></div>
+    <div><label>UM</label><select id="mp_um"><option>PZ</option><option>KG</option><option>LT</option><option>CT</option></select></div>
+    <div><label>Prezzo netto €</label><input id="mp_price" type="number" step="0.001" placeholder="0.000"></div>
+    <div><label>IVA %</label><select id="mp_iva"><option>10</option><option>4</option><option>22</option></select></div>
+  </div>
+  <div class="modal-foot"><button class="btn btn-ghost" onclick="closeProdModal()">Annulla</button><button class="btn btn-green" onclick="saveProd()">Salva</button></div>
+</div></div>
+
+<script>
+// ============================================================
+// PDF.js setup
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// ============================================================
+// DATABASE — Supabase + localStorage fallback
+const SUPABASE_URL = 'https://fkivfnpmwvponqbwxoad.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_YqS6Zcs4QP-4cdYviUX1fQ_F-qnj3ki';
+const SB = (path, opts={}) => fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+  ...opts,
+  headers: {'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json','Prefer':opts.prefer||'return=representation',...(opts.headers||{})}
+});
+
+const DB_KEY = 'tismasho_uniontrade_db';
+const DB_DEFAULT = {
+  orders: [{"id": "1254017", "data": "01/02/2026", "cons": "02/02/2026", "op": "Antonio Levante", "tot": 1805.15, "lines": [{"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "um": "KG", "qta": 54.0, "prezzo": 8.3, "iva": 10, "importo": 448.2}, {"desc": "BURGERSLICES W/RED CHEDDAR 9X1,082KG/88PZ 60%", "um": "PZ", "qta": 9.0, "prezzo": 9.3, "iva": 4, "importo": 83.7}, {"desc": "HEINZ MAIONESE PROFESSIONAL SECCHIELLO 5L", "um": "PZ", "qta": 10.0, "prezzo": 16.15, "iva": 10, "importo": 161.5}, {"desc": "HEINZ KETCHUP PAIL 5.7kg", "um": "PZ", "qta": 3.0, "prezzo": 14.37, "iva": 10, "importo": 43.11}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "um": "PZ", "qta": 2.0, "prezzo": 20.99, "iva": 4, "importo": 41.98}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G", "um": "PZ", "qta": 14.0, "prezzo": 7.1, "iva": 10, "importo": 99.4}, {"desc": "CHICKEN NUGGETS CORNFLAKES 12X1KG", "um": "PZ", "qta": 12.0, "prezzo": 7.0, "iva": 10, "importo": 84.0}, {"desc": "LA PINATA CHEDDAR CHEESE SAUCE 6x3kg", "um": "PZ", "qta": 6.0, "prezzo": 16.0, "iva": 10, "importo": 96.0}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "um": "PZ", "qta": 16.0, "prezzo": 2.51, "iva": 10, "importo": 40.16}, {"desc": "HEINZ SMOKEY BACONNAISE SQ. 6X1LT", "um": "PZ", "qta": 12.0, "prezzo": 6.39, "iva": 10, "importo": 76.68}, {"desc": "HEINZ BARBECUE SAUCE 2X2.15L", "um": "PZ", "qta": 4.0, "prezzo": 8.9, "iva": 10, "importo": 35.6}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "um": "PZ", "qta": 8.0, "prezzo": 7.2, "iva": 10, "importo": 57.6}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 45.0, "prezzo": 8.0, "iva": 10, "importo": 360.0}, {"desc": "CARTA BOBINA PRIME 168 (800STRAPPI) 2X1CNF", "um": "PZ", "qta": 4.0, "prezzo": 4.5, "iva": 22, "importo": 18.0}], "imp": 1645.93, "iva_v": 159.22, "store": "TRASTEVERE", "source": "storico"}, {"id": "1255389", "data": "03/02/2026", "cons": "04/02/2026", "op": "Antonio Levante", "tot": 1951.19, "lines": [{"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "um": "KG", "qta": 108.0, "prezzo": 8.3, "iva": 10, "importo": 896.4}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 40.0, "prezzo": 8.0, "iva": 10, "importo": 320.0}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G", "um": "PZ", "qta": 14.0, "prezzo": 7.1, "iva": 10, "importo": 99.4}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "um": "PZ", "qta": 4.0, "prezzo": 7.2, "iva": 10, "importo": 28.8}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "um": "PZ", "qta": 16.0, "prezzo": 2.51, "iva": 10, "importo": 40.16}, {"desc": "HEINZ SMOKEY BACONNAISE SQ. 6X1LT", "um": "PZ", "qta": 18.0, "prezzo": 6.0, "iva": 10, "importo": 108.0}, {"desc": "LA PINATA CHEDDAR CHEESE SAUCE 6x3kg", "um": "PZ", "qta": 6.0, "prezzo": 16.0, "iva": 10, "importo": 96.0}, {"desc": "HEINZ MAIONESE DIP POT 25G 100PZX1CT", "um": "PZ", "qta": 2.0, "prezzo": 20.99, "iva": 10, "importo": 41.98}, {"desc": "HEINZ KETCHUP DIP POT 25G 100PZX1CT", "um": "PZ", "qta": 2.0, "prezzo": 13.22, "iva": 10, "importo": 26.44}, {"desc": "SAUCE CUP 2oz PP 20x50pz (60ml)", "um": "PZ", "qta": 20.0, "prezzo": 1.69, "iva": 22, "importo": 33.8}, {"desc": "BURGERSLICES W/RED CHEDDAR 9X1,082KG/88PZ 60%", "um": "PZ", "qta": 9.0, "prezzo": 9.3, "iva": 4, "importo": 83.7}], "imp": 1774.68, "iva_v": 176.51, "store": "TRASTEVERE", "source": "storico"}, {"id": "1256021", "data": "04/02/2026", "cons": "05/02/2026", "op": "Antonio Levante", "tot": 225.23, "lines": [{"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 10.0, "prezzo": 8.0, "iva": 10, "importo": 80.0}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "um": "PZ", "qta": 6.0, "prezzo": 9.3, "iva": 4, "importo": 55.8}, {"desc": "HEINZ SMOKEY BACONNAISE SQ. 6X1LT", "um": "PZ", "qta": 12.0, "prezzo": 6.0, "iva": 10, "importo": 72.0}], "imp": 207.8, "iva_v": 17.43, "store": "TRASTEVERE", "source": "storico"}, {"id": "1256533", "data": "05/02/2026", "cons": "06/02/2026", "op": "Antonio Levante", "tot": 1709.32, "lines": [{"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "um": "KG", "qta": 90.0, "prezzo": 8.3, "iva": 10, "importo": 747.0}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "um": "PZ", "qta": 2.0, "prezzo": 20.99, "iva": 4, "importo": 41.98}, {"desc": "CHICKEN NUGGETS CORNFLAKES 12X1KG", "um": "PZ", "qta": 12.0, "prezzo": 7.0, "iva": 10, "importo": 84.0}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G", "um": "PZ", "qta": 14.0, "prezzo": 7.1, "iva": 10, "importo": 99.4}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "um": "PZ", "qta": 16.0, "prezzo": 2.51, "iva": 10, "importo": 40.16}, {"desc": "FABBRI SIMPLE' BASEGEL 8x1500g", "um": "PZ", "qta": 8.0, "prezzo": 18.38, "iva": 10, "importo": 147.04}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 40.0, "prezzo": 8.0, "iva": 10, "importo": 320.0}, {"desc": "CARTA BOBINA PRIME 168 (800STRAPPI) 2X1CNF", "um": "PZ", "qta": 4.0, "prezzo": 4.29, "iva": 22, "importo": 17.16}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "um": "PZ", "qta": 8.0, "prezzo": 7.2, "iva": 10, "importo": 57.6}], "imp": 1554.34, "iva_v": 154.98, "store": "TRASTEVERE", "source": "storico"}, {"id": "1256869", "data": "06/02/2026", "cons": "07/02/2026", "op": "Stella Lopes Sousa", "tot": 767.36, "lines": [{"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 35.0, "prezzo": 8.0, "iva": 10, "importo": 280.0}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "um": "PZ", "qta": 2.0, "prezzo": 20.99, "iva": 4, "importo": 41.98}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "um": "PZ", "qta": 6.0, "prezzo": 9.3, "iva": 4, "importo": 55.8}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "um": "PZ", "qta": 8.0, "prezzo": 2.51, "iva": 10, "importo": 20.08}, {"desc": "HEINZ MAIONESE PROFESSIONAL SECCHIELLO 5L", "um": "PZ", "qta": 2.0, "prezzo": 16.15, "iva": 10, "importo": 32.3}, {"desc": "HEINZ KETCHUP PAIL 5.7kg", "um": "PZ", "qta": 1.0, "prezzo": 14.37, "iva": 10, "importo": 14.37}, {"desc": "SCIROPPO D'ACERO PURO 12X250ML", "um": "PZ", "qta": 12.0, "prezzo": 5.25, "iva": 10, "importo": 63.0}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G", "um": "PZ", "qta": 14.0, "prezzo": 7.1, "iva": 10, "importo": 99.4}, {"desc": "LA PINATA CHEDDAR CHEESE SAUCE 6x3kg", "um": "PZ", "qta": 6.0, "prezzo": 16.0, "iva": 10, "importo": 96.0}], "imp": 702.93, "iva_v": 64.43, "store": "TRASTEVERE", "source": "storico"}, {"id": "1257372", "data": "08/02/2026", "cons": "09/02/2026", "op": "Antonio Levante", "tot": 1399.26, "lines": [{"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "um": "KG", "qta": 54.0, "prezzo": 8.3, "iva": 10, "importo": 448.2}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "um": "PZ", "qta": 2.0, "prezzo": 20.99, "iva": 4, "importo": 41.98}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "um": "PZ", "qta": 12.0, "prezzo": 9.3, "iva": 4, "importo": 111.6}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "um": "PZ", "qta": 8.0, "prezzo": 7.2, "iva": 10, "importo": 57.6}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G", "um": "PZ", "qta": 14.0, "prezzo": 7.1, "iva": 10, "importo": 99.4}, {"desc": "CHICKEN NUGGETS CORNFLAKES 12X1KG", "um": "PZ", "qta": 12.0, "prezzo": 7.0, "iva": 10, "importo": 84.0}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "um": "PZ", "qta": 16.0, "prezzo": 2.51, "iva": 10, "importo": 40.16}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 45.0, "prezzo": 8.0, "iva": 10, "importo": 360.0}, {"desc": "SAUCE CUP 2oz PP 20x50pz (60ml)", "um": "PZ", "qta": 20.0, "prezzo": 1.69, "iva": 22, "importo": 33.8}], "imp": 1276.74, "iva_v": 122.52, "store": "TRASTEVERE", "source": "storico"}, {"id": "1258752", "data": "10/02/2026", "cons": "11/02/2026", "op": "Antonio Levante", "tot": 1155.96, "lines": [{"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "um": "KG", "qta": 54.0, "prezzo": 8.3, "iva": 10, "importo": 448.2}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "um": "PZ", "qta": 6.0, "prezzo": 9.3, "iva": 4, "importo": 55.8}, {"desc": "LA PINATA CHEDDAR CHEESE SAUCE 6x3kg", "um": "PZ", "qta": 6.0, "prezzo": 16.0, "iva": 10, "importo": 96.0}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "um": "PZ", "qta": 4.0, "prezzo": 7.2, "iva": 10, "importo": 28.8}, {"desc": "HEINZ MAIONESE PROFESSIONAL SECCHIELLO 5L", "um": "PZ", "qta": 4.0, "prezzo": 16.5, "iva": 10, "importo": 66.0}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "um": "PZ", "qta": 8.0, "prezzo": 2.51, "iva": 10, "importo": 20.08}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 40.0, "prezzo": 8.0, "iva": 10, "importo": 320.0}, {"desc": "CARTA BOBINA PRIME 168 (800STRAPPI) 2X1CNF", "um": "PZ", "qta": 4.0, "prezzo": 4.29, "iva": 22, "importo": 17.16}], "imp": 1052.04, "iva_v": 103.92, "store": "TRASTEVERE", "source": "storico"}, {"id": "1259852", "data": "12/02/2026", "cons": "13/02/2026", "op": "Alessia De Simone", "tot": 1902.74, "lines": [{"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "um": "KG", "qta": 72.0, "prezzo": 8.3, "iva": 10, "importo": 597.6}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "um": "PZ", "qta": 6.0, "prezzo": 9.3, "iva": 4, "importo": 55.8}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G (10pzx95g)", "um": "PZ", "qta": 14.0, "prezzo": 7.1, "iva": 10, "importo": 99.4}, {"desc": "CHICKEN NUGGETS CORNFLAKES 12X1KG (47pzX21g)", "um": "PZ", "qta": 12.0, "prezzo": 7.0, "iva": 10, "importo": 84.0}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "um": "PZ", "qta": 4.0, "prezzo": 7.2, "iva": 10, "importo": 28.8}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "um": "PZ", "qta": 16.0, "prezzo": 2.51, "iva": 10, "importo": 40.16}, {"desc": "HEINZ BARBECUE SAUCE 2X2.15L", "um": "PZ", "qta": 4.0, "prezzo": 9.5, "iva": 10, "importo": 38.0}, {"desc": "HEINZ SMOKEY BACONNAISE SQ. 6X1LT", "um": "PZ", "qta": 6.0, "prezzo": 6.0, "iva": 10, "importo": 36.0}, {"desc": "LA PINATA CHEDDAR CHEESE SAUCE 6x3kg", "um": "PZ", "qta": 6.0, "prezzo": 16.0, "iva": 10, "importo": 96.0}, {"desc": "HEINZ MAIONESE DIP POT 25G 100PZX1CT", "um": "PZ", "qta": 2.0, "prezzo": 20.99, "iva": 10, "importo": 41.98}, {"desc": "HEINZ KETCHUP DIP POT 25G 100PZX1CT", "um": "PZ", "qta": 2.0, "prezzo": 13.22, "iva": 10, "importo": 26.44}, {"desc": "HEINZ KETCHUP PAIL 5.7kg", "um": "PZ", "qta": 6.0, "prezzo": 14.99, "iva": 10, "importo": 89.94}, {"desc": "HEINZ MAIONESE PROFESSIONAL SECCHIELLO 5L", "um": "PZ", "qta": 6.0, "prezzo": 16.5, "iva": 10, "importo": 99.0}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 45.0, "prezzo": 8.0, "iva": 10, "importo": 360.0}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "um": "PZ", "qta": 2.0, "prezzo": 20.99, "iva": 4, "importo": 41.98}], "imp": 1735.1, "iva_v": 167.64, "store": "TRASTEVERE", "source": "storico"}, {"id": "1260385", "data": "13/02/2026", "cons": "14/02/2026", "op": "Antonio Levante", "tot": 1044.29, "lines": [{"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "um": "PZ", "qta": 6.0, "prezzo": 9.3, "iva": 4, "importo": 55.8}, {"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "um": "KG", "qta": 36.0, "prezzo": 8.3, "iva": 10, "importo": 298.8}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "um": "PZ", "qta": 8.0, "prezzo": 2.51, "iva": 10, "importo": 20.08}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 55.0, "prezzo": 8.0, "iva": 10, "importo": 440.0}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G (10pzx95g)", "um": "PZ", "qta": 14.0, "prezzo": 7.1, "iva": 10, "importo": 99.4}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "um": "PZ", "qta": 4.0, "prezzo": 7.2, "iva": 10, "importo": 28.8}, {"desc": "CARTA BOBINA PRIME 168 (800STRAPPI)55949 2X1CNF", "um": "PZ", "qta": 2.0, "prezzo": 4.29, "iva": 22, "importo": 8.58}], "imp": 951.46, "iva_v": 92.83, "store": "TRASTEVERE", "source": "storico"}, {"id": "1260796", "data": "15/02/2026", "cons": "16/02/2026", "op": "Antonio Levante", "tot": 1600.33, "lines": [{"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "um": "PZ", "qta": 12.0, "prezzo": 9.3, "iva": 4, "importo": 111.6}, {"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "um": "KG", "qta": 72.0, "prezzo": 8.3, "iva": 10, "importo": 597.6}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 40.0, "prezzo": 8.0, "iva": 10, "importo": 320.0}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G (10pzx95g)", "um": "PZ", "qta": 14.0, "prezzo": 7.1, "iva": 10, "importo": 99.4}, {"desc": "CHICKEN NUGGETS CORNFLAKES 12X1KG (47pzX21g)", "um": "PZ", "qta": 12.0, "prezzo": 7.0, "iva": 10, "importo": 84.0}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "um": "PZ", "qta": 8.0, "prezzo": 7.2, "iva": 10, "importo": 57.6}, {"desc": "HEINZ SMOKEY BACONNAISE SQ. 6X1LT", "um": "PZ", "qta": 12.0, "prezzo": 6.0, "iva": 10, "importo": 72.0}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "um": "PZ", "qta": 16.0, "prezzo": 2.51, "iva": 10, "importo": 40.16}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "um": "PZ", "qta": 3.0, "prezzo": 20.99, "iva": 4, "importo": 62.97}, {"desc": "CARTA BOBINA PRIME 168 (800STRAPPI)55949 2X1CNF", "um": "PZ", "qta": 4.0, "prezzo": 4.29, "iva": 22, "importo": 17.16}], "imp": 1462.49, "iva_v": 137.84, "store": "TRASTEVERE", "source": "storico"}, {"id": "1262127", "data": "17/02/2026", "cons": "18/02/2026", "op": "Antonio Levante", "tot": 1528.37, "lines": [{"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "um": "KG", "qta": 72.0, "prezzo": 8.3, "iva": 10, "importo": 597.6}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "um": "PZ", "qta": 12.0, "prezzo": 9.3, "iva": 4, "importo": 111.6}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "um": "PZ", "qta": 4.0, "prezzo": 7.2, "iva": 10, "importo": 28.8}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 45.0, "prezzo": 8.0, "iva": 10, "importo": 360.0}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "um": "PZ", "qta": 8.0, "prezzo": 2.51, "iva": 10, "importo": 20.08}, {"desc": "HEINZ SMOKEY BACONNAISE SQ. 6X1LT", "um": "PZ", "qta": 6.0, "prezzo": 6.0, "iva": 10, "importo": 36.0}, {"desc": "HEINZ MAIONESE PROFESSIONAL SECCHIELLO 5L", "um": "PZ", "qta": 5.0, "prezzo": 16.5, "iva": 10, "importo": 82.5}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "um": "PZ", "qta": 3.0, "prezzo": 20.99, "iva": 4, "importo": 62.97}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G (10pzx95g)", "um": "PZ", "qta": 14.0, "prezzo": 7.1, "iva": 10, "importo": 99.4}], "imp": 1398.95, "iva_v": 129.42, "store": "TRASTEVERE", "source": "storico"}, {"id": "1263297", "data": "19/02/2026", "cons": "20/02/2026", "op": "Alessia De Simone", "tot": 1401.36, "lines": [{"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "um": "KG", "qta": 54.0, "prezzo": 8.3, "iva": 10, "importo": 448.2}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "um": "PZ", "qta": 6.0, "prezzo": 9.3, "iva": 4, "importo": 55.8}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "um": "PZ", "qta": 2.0, "prezzo": 20.99, "iva": 4, "importo": 41.98}, {"desc": "CHICKEN NUGGETS CORNFLAKES 12X1KG (47pzX21g)", "um": "PZ", "qta": 12.0, "prezzo": 7.0, "iva": 10, "importo": 84.0}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 50.0, "prezzo": 8.0, "iva": 10, "importo": 400.0}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "um": "PZ", "qta": 4.0, "prezzo": 7.2, "iva": 10, "importo": 28.8}, {"desc": "CARTA BOBINA PRIME 168 (800STRAPPI)55949 2X1CNF", "um": "PZ", "qta": 2.0, "prezzo": 4.29, "iva": 22, "importo": 8.58}, {"desc": "HEINZ BARBECUE SAUCE 2X2.15L", "um": "PZ", "qta": 2.0, "prezzo": 9.5, "iva": 10, "importo": 19.0}, {"desc": "LA PINATA CHEDDAR CHEESE SAUCE 6x3kg", "um": "PZ", "qta": 12.0, "prezzo": 16.0, "iva": 10, "importo": 192.0}], "imp": 1278.36, "iva_v": 123.0, "store": "TRASTEVERE", "source": "storico"}, {"id": "1263886", "data": "20/02/2026", "cons": "21/02/2026", "op": "Antonio Levante", "tot": 1293.64, "lines": [{"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "um": "KG", "qta": 36.0, "prezzo": 8.3, "iva": 10, "importo": 298.8}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "um": "PZ", "qta": 6.0, "prezzo": 9.3, "iva": 4, "importo": 55.8}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "um": "PZ", "qta": 16.0, "prezzo": 2.51, "iva": 10, "importo": 40.16}, {"desc": "HEINZ SMOKEY BACONNAISE SQ. 6X1LT", "um": "PZ", "qta": 12.0, "prezzo": 6.0, "iva": 10, "importo": 72.0}, {"desc": "HEINZ BARBECUE SAUCE 2X2.15L", "um": "PZ", "qta": 2.0, "prezzo": 9.5, "iva": 10, "importo": 19.0}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G (10pzx95g)", "um": "PZ", "qta": 14.0, "prezzo": 7.1, "iva": 10, "importo": 99.4}, {"desc": "CARTA BOBINA PRIME 168 (800STRAPPI)55949 2X1CNF", "um": "PZ", "qta": 2.0, "prezzo": 4.29, "iva": 22, "importo": 8.58}, {"desc": "NANG-FAH SRIRACHA CHILI SAUCE 12x450ml", "um": "PZ", "qta": 12.0, "prezzo": 2.79, "iva": 10, "importo": 33.48}, {"desc": "HEINZ MAIONESE DIP POT 25G 100PZX1CT", "um": "PZ", "qta": 2.0, "prezzo": 20.99, "iva": 10, "importo": 41.98}, {"desc": "HEINZ KETCHUP DIP POT 25G 100PZX1CT", "um": "PZ", "qta": 2.0, "prezzo": 13.22, "iva": 10, "importo": 26.44}, {"desc": "HEINZ MAIONESE PROFESSIONAL SECCHIELLO 5L", "um": "PZ", "qta": 5.0, "prezzo": 16.5, "iva": 10, "importo": 82.5}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 50.0, "prezzo": 8.0, "iva": 10, "importo": 400.0}], "imp": 1178.14, "iva_v": 115.5, "store": "TRASTEVERE", "source": "storico"}, {"id": "1255417", "data": "03/02/2026", "cons": "04/02/2026", "op": "Antonio Levante", "tot": 1666.47, "lines": [{"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 45.0, "prezzo": 8.0, "iva": 10, "importo": 360.0}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "um": "PZ", "qta": 3.0, "prezzo": 20.99, "iva": 4, "importo": 62.97}, {"desc": "CHICKEN NUGGETS CORNFLAKES 12X1KG", "um": "PZ", "qta": 12.0, "prezzo": 7.0, "iva": 10, "importo": 84.0}, {"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "um": "KG", "qta": 108.0, "prezzo": 8.3, "iva": 10, "importo": 896.4}, {"desc": "LA PINATA CHEDDAR CHEESE SAUCE 6x3kg", "um": "PZ", "qta": 6.0, "prezzo": 16.0, "iva": 10, "importo": 96.0}, {"desc": "CARTA BOBINA PRIME 168 (800STRAPPI) 2X1CNF", "um": "PZ", "qta": 4.0, "prezzo": 4.29, "iva": 22, "importo": 17.16}], "imp": 1516.53, "iva_v": 149.94, "store": "PIAZZA ISTRIA", "source": "storico"}, {"id": "1256539", "data": "05/02/2026", "cons": "06/02/2026", "op": "Antonio Levante", "tot": 1285.81, "lines": [{"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "um": "PZ", "qta": 6.0, "prezzo": 9.3, "iva": 4, "importo": 55.8}, {"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "um": "KG", "qta": 54.0, "prezzo": 8.3, "iva": 10, "importo": 448.2}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "um": "PZ", "qta": 2.0, "prezzo": 20.99, "iva": 4, "importo": 41.98}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G", "um": "PZ", "qta": 14.0, "prezzo": 7.1, "iva": 10, "importo": 99.4}, {"desc": "CHICKEN NUGGETS CORNFLAKES 12X1KG", "um": "PZ", "qta": 12.0, "prezzo": 7.0, "iva": 10, "importo": 84.0}, {"desc": "HEINZ MAIONESE DIP POT 25G 100PZX1CT", "um": "PZ", "qta": 1.0, "prezzo": 20.99, "iva": 10, "importo": 20.99}, {"desc": "HEINZ SMOKEY BACONNAISE SQ. 6X1LT", "um": "PZ", "qta": 6.0, "prezzo": 6.0, "iva": 10, "importo": 36.0}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "um": "PZ", "qta": 8.0, "prezzo": 2.51, "iva": 10, "importo": 20.08}, {"desc": "HEINZ BARBECUE SAUCE 2X2.15L", "um": "PZ", "qta": 2.0, "prezzo": 9.5, "iva": 10, "importo": 19.0}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "um": "PZ", "qta": 4.0, "prezzo": 7.2, "iva": 10, "importo": 28.8}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 40.0, "prezzo": 8.0, "iva": 10, "importo": 320.0}], "imp": 1174.25, "iva_v": 111.56, "store": "PIAZZA ISTRIA", "source": "storico"}, {"id": "1256928", "data": "06/02/2026", "cons": "N/D", "op": "Francesca D'Achille", "tot": 1181.29, "lines": [{"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "um": "PZ", "qta": 2.0, "prezzo": 20.99, "iva": 4, "importo": 41.98}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 50.0, "prezzo": 8.0, "iva": 10, "importo": 400.0}, {"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "um": "KG", "qta": 45.0, "prezzo": 8.3, "iva": 10, "importo": 373.5}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "um": "PZ", "qta": 12.0, "prezzo": 9.3, "iva": 4, "importo": 111.6}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "um": "PZ", "qta": 16.0, "prezzo": 2.51, "iva": 10, "importo": 40.16}, {"desc": "CARTA BOBINA PRIME 168 (800STRAPPI) 2X1CNF", "um": "PZ", "qta": 4.0, "prezzo": 4.29, "iva": 22, "importo": 17.16}, {"desc": "LA PINATA CHEDDAR CHEESE SAUCE 6x3kg", "um": "PZ", "qta": 6.0, "prezzo": 16.0, "iva": 10, "importo": 96.0}], "imp": 1080.4, "iva_v": 100.89, "store": "PIAZZA ISTRIA", "source": "storico"}, {"id": "1257373", "data": "08/02/2026", "cons": "09/02/2026", "op": "Antonio Levante", "tot": 1671.35, "lines": [{"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "um": "KG", "qta": 72.0, "prezzo": 8.3, "iva": 10, "importo": 597.6}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "um": "PZ", "qta": 12.0, "prezzo": 9.3, "iva": 4, "importo": 111.6}, {"desc": "LA PINATA CHEDDAR CHEESE SAUCE 6x3kg", "um": "PZ", "qta": 6.0, "prezzo": 16.0, "iva": 10, "importo": 96.0}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G", "um": "PZ", "qta": 14.0, "prezzo": 7.1, "iva": 10, "importo": 99.4}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 50.0, "prezzo": 8.0, "iva": 10, "importo": 400.0}, {"desc": "HEINZ SMOKEY BACONNAISE SQ. 6X1LT", "um": "PZ", "qta": 12.0, "prezzo": 6.0, "iva": 10, "importo": 72.0}, {"desc": "HEINZ MAIONESE DIP POT 25G 100PZX1CT", "um": "PZ", "qta": 2.0, "prezzo": 20.99, "iva": 10, "importo": 41.98}, {"desc": "HEINZ KETCHUP DIP POT 25G 100PZX1CT", "um": "PZ", "qta": 2.0, "prezzo": 13.22, "iva": 10, "importo": 26.44}, {"desc": "NANG-FAH SRIRACHA CHILI SAUCE 12x450ml", "um": "PZ", "qta": 12.0, "prezzo": 2.79, "iva": 10, "importo": 33.48}, {"desc": "CARTA BOBINA PRIME 168 (800STRAPPI) 2X1CNF", "um": "PZ", "qta": 2.0, "prezzo": 4.29, "iva": 22, "importo": 8.58}, {"desc": "SAUCE CUP 2oz PP 20x50pz (60ml)", "um": "PZ", "qta": 20.0, "prezzo": 1.69, "iva": 22, "importo": 33.8}], "imp": 1520.88, "iva_v": 150.47, "store": "PIAZZA ISTRIA", "source": "storico"}, {"id": "1258755", "data": "10/02/2026", "cons": "11/02/2026", "op": "Antonio Levante", "tot": 1395.95, "lines": [{"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "um": "KG", "qta": 45.0, "prezzo": 8.3, "iva": 10, "importo": 373.5}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "um": "PZ", "qta": 6.0, "prezzo": 9.3, "iva": 4, "importo": 55.8}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G", "um": "PZ", "qta": 14.0, "prezzo": 7.1, "iva": 10, "importo": 99.4}, {"desc": "CHICKEN NUGGETS CORNFLAKES 12X1KG", "um": "PZ", "qta": 12.0, "prezzo": 7.0, "iva": 10, "importo": 84.0}, {"desc": "HEINZ SMOKEY BACONNAISE SQ. 6X1LT", "um": "PZ", "qta": 18.0, "prezzo": 6.0, "iva": 10, "importo": 108.0}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "um": "PZ", "qta": 16.0, "prezzo": 2.51, "iva": 10, "importo": 40.16}, {"desc": "HEINZ BARBECUE SAUCE 2X2.15L", "um": "PZ", "qta": 2.0, "prezzo": 9.5, "iva": 10, "importo": 19.0}, {"desc": "HEINZ MAIONESE PROFESSIONAL SECCHIELLO 5L", "um": "PZ", "qta": 2.0, "prezzo": 16.5, "iva": 10, "importo": 33.0}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "um": "PZ", "qta": 5.0, "prezzo": 20.99, "iva": 4, "importo": 104.95}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 45.0, "prezzo": 8.0, "iva": 10, "importo": 360.0}], "imp": 1277.81, "iva_v": 118.14, "store": "PIAZZA ISTRIA", "source": "storico"}, {"id": "1259845", "data": "12/02/2026", "cons": "13/02/2026", "op": "Alessia De Simone", "tot": 1450.98, "lines": [{"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "um": "KG", "qta": 54.0, "prezzo": 8.3, "iva": 10, "importo": 448.2}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G (10pzx95g)", "um": "PZ", "qta": 14.0, "prezzo": 7.1, "iva": 10, "importo": 99.4}, {"desc": "CHICKEN NUGGETS CORNFLAKES 12X1KG (47pzX21g)", "um": "PZ", "qta": 12.0, "prezzo": 7.0, "iva": 10, "importo": 84.0}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "um": "PZ", "qta": 4.0, "prezzo": 7.2, "iva": 10, "importo": 28.8}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "um": "PZ", "qta": 16.0, "prezzo": 2.51, "iva": 10, "importo": 40.16}, {"desc": "HEINZ SMOKEY BACONNAISE SQ. 6X1LT", "um": "PZ", "qta": 12.0, "prezzo": 6.0, "iva": 10, "importo": 72.0}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "um": "PZ", "qta": 2.0, "prezzo": 20.99, "iva": 4, "importo": 41.98}, {"desc": "CARTA BOBINA PRIME 168 (800STRAPPI)55949 2X1CNF", "um": "PZ", "qta": 8.0, "prezzo": 4.29, "iva": 22, "importo": 34.32}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "um": "PZ", "qta": 6.0, "prezzo": 9.3, "iva": 4, "importo": 55.8}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 40.0, "prezzo": 8.0, "iva": 10, "importo": 320.0}, {"desc": "LA PINATA CHEDDAR CHEESE SAUCE 6x3kg", "um": "PZ", "qta": 6.0, "prezzo": 16.0, "iva": 10, "importo": 96.0}], "imp": 1320.66, "iva_v": 130.32, "store": "PIAZZA ISTRIA", "source": "storico"}, {"id": "1260378", "data": "13/02/2026", "cons": "14/02/2026", "op": "Antonio Levante", "tot": 1050.54, "lines": [{"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "um": "KG", "qta": 36.0, "prezzo": 8.3, "iva": 10, "importo": 298.8}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "um": "PZ", "qta": 6.0, "prezzo": 9.3, "iva": 4, "importo": 55.8}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 50.0, "prezzo": 8.0, "iva": 10, "importo": 400.0}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G (10pzx95g)", "um": "PZ", "qta": 14.0, "prezzo": 7.1, "iva": 10, "importo": 99.4}, {"desc": "CHICKEN NUGGETS CORNFLAKES 12X1KG (47pzX21g)", "um": "PZ", "qta": 12.0, "prezzo": 7.0, "iva": 10, "importo": 84.0}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "um": "PZ", "qta": 8.0, "prezzo": 2.51, "iva": 10, "importo": 20.08}], "imp": 958.08, "iva_v": 92.46, "store": "PIAZZA ISTRIA", "source": "storico"}, {"id": "1260793", "data": "15/02/2026", "cons": "16/02/2026", "op": "Antonio Levante", "tot": 1684.38, "lines": [{"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "um": "KG", "qta": 54.0, "prezzo": 8.3, "iva": 10, "importo": 448.2}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "um": "PZ", "qta": 12.0, "prezzo": 9.3, "iva": 4, "importo": 111.6}, {"desc": "LA PINATA CHEDDAR CHEESE SAUCE 6x3kg", "um": "PZ", "qta": 6.0, "prezzo": 16.0, "iva": 10, "importo": 96.0}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "um": "PZ", "qta": 2.0, "prezzo": 20.99, "iva": 4, "importo": 41.98}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G (10pzx95g)", "um": "PZ", "qta": 14.0, "prezzo": 7.1, "iva": 10, "importo": 99.4}, {"desc": "CHICKEN NUGGETS CORNFLAKES 12X1KG (47pzX21g)", "um": "PZ", "qta": 12.0, "prezzo": 7.0, "iva": 10, "importo": 84.0}, {"desc": "HEINZ SMOKEY BACONNAISE SQ. 6X1LT", "um": "PZ", "qta": 12.0, "prezzo": 6.0, "iva": 10, "importo": 72.0}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "um": "PZ", "qta": 16.0, "prezzo": 2.51, "iva": 10, "importo": 40.16}, {"desc": "NANG-FAH SRIRACHA CHILI SAUCE 12x450ml", "um": "PZ", "qta": 12.0, "prezzo": 2.79, "iva": 10, "importo": 33.48}, {"desc": "SCIROPPO D'ACERO PURO 12X250ML", "um": "PZ", "qta": 12.0, "prezzo": 5.25, "iva": 10, "importo": 63.0}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "um": "PZ", "qta": 4.0, "prezzo": 7.2, "iva": 10, "importo": 28.8}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 45.0, "prezzo": 8.0, "iva": 10, "importo": 360.0}, {"desc": "CARTA BOBINA PRIME 168 (800STRAPPI)55949 2X1CNF", "um": "PZ", "qta": 4.0, "prezzo": 4.29, "iva": 22, "importo": 17.16}, {"desc": "HEINZ MAIONESE DIP POT 25G 100PZX1CT", "um": "PZ", "qta": 2.0, "prezzo": 20.99, "iva": 10, "importo": 41.98}], "imp": 1537.76, "iva_v": 146.62, "store": "PIAZZA ISTRIA", "source": "storico"}, {"id": "1262140", "data": "17/02/2026", "cons": "18/02/2026", "op": "Antonio Levante", "tot": 2220.32, "lines": [{"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "um": "KG", "qta": 108.0, "prezzo": 8.3, "iva": 10, "importo": 896.4}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 50.0, "prezzo": 8.0, "iva": 10, "importo": 400.0}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "um": "PZ", "qta": 6.0, "prezzo": 9.3, "iva": 4, "importo": 55.8}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "um": "PZ", "qta": 4.0, "prezzo": 20.99, "iva": 4, "importo": 83.96}, {"desc": "HEINZ MAIONESE PROFESSIONAL SECCHIELLO 5L", "um": "PZ", "qta": 3.0, "prezzo": 16.5, "iva": 10, "importo": 49.5}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "um": "PZ", "qta": 16.0, "prezzo": 2.51, "iva": 10, "importo": 40.16}, {"desc": "HEINZ BARBECUE SAUCE 2X2.15L", "um": "PZ", "qta": 4.0, "prezzo": 9.5, "iva": 10, "importo": 38.0}, {"desc": "HEINZ SMOKEY BACONNAISE SQ. 6X1LT", "um": "PZ", "qta": 6.0, "prezzo": 6.0, "iva": 10, "importo": 36.0}, {"desc": "LA PINATA CHEDDAR CHEESE SAUCE 6x3kg", "um": "PZ", "qta": 6.0, "prezzo": 16.0, "iva": 10, "importo": 96.0}, {"desc": "SCIROPPO D'ACERO PURO 12X250ML", "um": "PZ", "qta": 12.0, "prezzo": 5.25, "iva": 10, "importo": 63.0}, {"desc": "NANG-FAH SRIRACHA CHILI SAUCE 12x450ml", "um": "PZ", "qta": 12.0, "prezzo": 2.79, "iva": 10, "importo": 33.48}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G (10pzx95g)", "um": "PZ", "qta": 14.0, "prezzo": 7.1, "iva": 10, "importo": 99.4}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "um": "PZ", "qta": 4.0, "prezzo": 7.2, "iva": 10, "importo": 28.8}, {"desc": "FRUFRU LAMPONE CONGELATI RIC. CIOCCOLATO 16X140G", "um": "PZ", "qta": 16.0, "prezzo": 3.3, "iva": 10, "importo": 52.8}, {"desc": "FRUFRU FRAGOLA CONGELATI RIC. CIOCCOLATO 16X140G", "um": "PZ", "qta": 16.0, "prezzo": 3.3, "iva": 10, "importo": 52.8}], "imp": 2026.1, "iva_v": 194.22, "store": "PIAZZA ISTRIA", "source": "storico"}, {"id": "1263292", "data": "19/02/2026", "cons": "20/02/2026", "op": "Alessia De Simone", "tot": 1377.72, "lines": [{"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "um": "PZ", "qta": 12.0, "prezzo": 9.3, "iva": 4, "importo": 111.6}, {"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "um": "KG", "qta": 54.0, "prezzo": 8.3, "iva": 10, "importo": 448.2}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "um": "PZ", "qta": 2.0, "prezzo": 20.99, "iva": 4, "importo": 41.98}, {"desc": "CHICKEN NUGGETS CORNFLAKES 12X1KG (47pzX21g)", "um": "PZ", "qta": 12.0, "prezzo": 7.0, "iva": 10, "importo": 84.0}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "um": "PZ", "qta": 8.0, "prezzo": 7.2, "iva": 10, "importo": 57.6}, {"desc": "HEINZ SMOKEY BACONNAISE SQ. 6X1LT", "um": "PZ", "qta": 12.0, "prezzo": 6.0, "iva": 10, "importo": 72.0}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 50.0, "prezzo": 8.0, "iva": 10, "importo": 400.0}, {"desc": "CARTA BOBINA PRIME 168 (800STRAPPI)55949 2X1CNF", "um": "PZ", "qta": 4.0, "prezzo": 4.29, "iva": 22, "importo": 17.16}, {"desc": "HEINZ KETCHUP DIP POT 25G 100PZX1CT", "um": "PZ", "qta": 2.0, "prezzo": 13.22, "iva": 10, "importo": 26.44}], "imp": 1258.98, "iva_v": 118.74, "store": "PIAZZA ISTRIA", "source": "storico"}, {"id": "1263890", "data": "20/02/2026", "cons": "21/02/2026", "op": "Antonio Levante", "tot": 1081.25, "lines": [{"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "um": "KG", "qta": 36.0, "prezzo": 8.3, "iva": 10, "importo": 298.8}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G (10pzx95g)", "um": "PZ", "qta": 14.0, "prezzo": 7.1, "iva": 10, "importo": 99.4}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "um": "PZ", "qta": 6.0, "prezzo": 9.3, "iva": 4, "importo": 55.8}, {"desc": "HEINZ SMOKEY BACONNAISE SQ. 6X1LT", "um": "PZ", "qta": 6.0, "prezzo": 6.0, "iva": 10, "importo": 36.0}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 50.0, "prezzo": 8.0, "iva": 10, "importo": 400.0}, {"desc": "LA PINATA CHEDDAR CHEESE SAUCE 6x3kg", "um": "PZ", "qta": 6.0, "prezzo": 16.0, "iva": 10, "importo": 96.0}], "imp": 986.0, "iva_v": 95.25, "store": "PIAZZA ISTRIA", "source": "storico"}, {"id": "1255412", "data": "03/02/2026", "cons": "04/02/2026", "op": "Antonio Levante", "tot": 1933.37, "lines": [{"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 40.0, "prezzo": 8.0, "iva": 10, "importo": 320.0}, {"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "um": "KG", "qta": 108.0, "prezzo": 8.3, "iva": 10, "importo": 896.4}, {"desc": "HEINZ SMOKEY BACONNAISE SQ. 6X1LT", "um": "PZ", "qta": 12.0, "prezzo": 6.0, "iva": 10, "importo": 72.0}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "um": "PZ", "qta": 8.0, "prezzo": 2.51, "iva": 10, "importo": 20.08}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "um": "PZ", "qta": 3.0, "prezzo": 20.99, "iva": 4, "importo": 62.97}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "um": "PZ", "qta": 8.0, "prezzo": 7.2, "iva": 10, "importo": 57.6}, {"desc": "CARTA BOBINA PRIME 168 (800STRAPPI) 2X1CNF", "um": "PZ", "qta": 4.0, "prezzo": 4.5, "iva": 22, "importo": 18.0}, {"desc": "LA PINATA CHEDDAR CHEESE SAUCE 6x3kg", "um": "PZ", "qta": 6.0, "prezzo": 16.0, "iva": 10, "importo": 96.0}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G", "um": "PZ", "qta": 14.0, "prezzo": 7.1, "iva": 10, "importo": 99.4}, {"desc": "SAUCE CUP 2oz PP 20x50pz (60ml)", "um": "PZ", "qta": 20.0, "prezzo": 1.69, "iva": 22, "importo": 33.8}, {"desc": "BURGERSLICES W/RED CHEDDAR 9X1,082KG/88PZ 60%", "um": "PZ", "qta": 9.0, "prezzo": 9.3, "iva": 4, "importo": 83.7}], "imp": 1759.95, "iva_v": 173.42, "store": "PONTE MILVIO", "source": "storico"}, {"id": "1256536", "data": "05/02/2026", "cons": "06/02/2026", "op": "Antonio Levante", "tot": 600.35, "lines": [{"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "um": "PZ", "qta": 6.0, "prezzo": 9.3, "iva": 4, "importo": 55.8}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "um": "PZ", "qta": 2.0, "prezzo": 20.99, "iva": 4, "importo": 41.98}, {"desc": "CHICKEN NUGGETS CORNFLAKES 12X1KG", "um": "PZ", "qta": 12.0, "prezzo": 7.0, "iva": 10, "importo": 84.0}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "um": "PZ", "qta": 8.0, "prezzo": 2.51, "iva": 10, "importo": 20.08}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 25.0, "prezzo": 8.0, "iva": 10, "importo": 200.0}, {"desc": "CARTA BOBINA PRIME 168 (800STRAPPI) 2X1CNF", "um": "PZ", "qta": 4.0, "prezzo": 4.29, "iva": 22, "importo": 17.16}, {"desc": "LA PINATA CHEDDAR CHEESE SAUCE 6x3kg", "um": "PZ", "qta": 6.0, "prezzo": 16.0, "iva": 10, "importo": 96.0}, {"desc": "HEINZ KETCHUP DIP POT 25G 100PZX1CT", "um": "PZ", "qta": 1.0, "prezzo": 13.22, "iva": 10, "importo": 13.22}, {"desc": "HEINZ MAIONESE DIP POT 25G 100PZX1CT", "um": "PZ", "qta": 1.0, "prezzo": 20.99, "iva": 10, "importo": 20.99}], "imp": 549.23, "iva_v": 51.12, "store": "PONTE MILVIO", "source": "storico"}, {"id": "1256871", "data": "06/02/2026", "cons": "07/02/2026", "op": "Francesca D'Achille", "tot": 821.43, "lines": [{"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "um": "KG", "qta": 45.0, "prezzo": 8.3, "iva": 10, "importo": 373.5}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "um": "PZ", "qta": 6.0, "prezzo": 9.3, "iva": 4, "importo": 55.8}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G", "um": "PZ", "qta": 14.0, "prezzo": 7.1, "iva": 10, "importo": 99.4}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "um": "PZ", "qta": 4.0, "prezzo": 7.2, "iva": 10, "importo": 28.8}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 20.0, "prezzo": 8.0, "iva": 10, "importo": 160.0}, {"desc": "HEINZ MAIONESE PROFESSIONAL SECCHIELLO 5L", "um": "PZ", "qta": 2.0, "prezzo": 16.15, "iva": 10, "importo": 32.3}], "imp": 749.8, "iva_v": 71.63, "store": "PONTE MILVIO", "source": "storico"}, {"id": "1257371", "data": "08/02/2026", "cons": "09/02/2026", "op": "Antonio Levante", "tot": 2090.91, "lines": [{"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 60.0, "prezzo": 8.0, "iva": 10, "importo": 480.0}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "um": "PZ", "qta": 2.0, "prezzo": 20.99, "iva": 4, "importo": 41.98}, {"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "um": "KG", "qta": 90.0, "prezzo": 8.3, "iva": 10, "importo": 747.0}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "um": "PZ", "qta": 12.0, "prezzo": 9.3, "iva": 4, "importo": 111.6}, {"desc": "LA PINATA CHEDDAR CHEESE SAUCE 6x3kg", "um": "PZ", "qta": 6.0, "prezzo": 16.0, "iva": 10, "importo": 96.0}, {"desc": "HEINZ MAIONESE DIP POT 25G 100PZX1CT", "um": "PZ", "qta": 2.0, "prezzo": 20.99, "iva": 10, "importo": 41.98}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "um": "PZ", "qta": 16.0, "prezzo": 2.51, "iva": 10, "importo": 40.16}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "um": "PZ", "qta": 8.0, "prezzo": 7.2, "iva": 10, "importo": 57.6}, {"desc": "HEINZ SMOKEY BACONNAISE SQ. 6X1LT", "um": "PZ", "qta": 12.0, "prezzo": 6.0, "iva": 10, "importo": 72.0}, {"desc": "SAUCE CUP 2oz PP 20x50pz (60ml)", "um": "PZ", "qta": 20.0, "prezzo": 1.69, "iva": 22, "importo": 33.8}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G", "um": "PZ", "qta": 14.0, "prezzo": 7.1, "iva": 10, "importo": 99.4}, {"desc": "CHICKEN NUGGETS CORNFLAKES 12X1KG", "um": "PZ", "qta": 12.0, "prezzo": 7.0, "iva": 10, "importo": 84.0}], "imp": 1905.52, "iva_v": 185.39, "store": "PONTE MILVIO", "source": "storico"}, {"id": "1258763", "data": "10/02/2026", "cons": "11/02/2026", "op": "Antonio Levante", "tot": 1101.39, "lines": [{"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "um": "KG", "qta": 63.0, "prezzo": 8.3, "iva": 10, "importo": 522.9}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "um": "PZ", "qta": 6.0, "prezzo": 9.3, "iva": 4, "importo": 55.8}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "um": "PZ", "qta": 2.0, "prezzo": 20.99, "iva": 4, "importo": 41.98}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 35.0, "prezzo": 8.0, "iva": 10, "importo": 280.0}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "um": "PZ", "qta": 4.0, "prezzo": 7.2, "iva": 10, "importo": 28.8}, {"desc": "HEINZ BARBECUE SAUCE 2X2.15L", "um": "PZ", "qta": 4.0, "prezzo": 9.5, "iva": 10, "importo": 38.0}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "um": "PZ", "qta": 8.0, "prezzo": 2.51, "iva": 10, "importo": 20.08}, {"desc": "CARTA BOBINA PRIME 168 (800STRAPPI)55949 2X1CNF", "um": "PZ", "qta": 4.0, "prezzo": 4.29, "iva": 22, "importo": 17.16}], "imp": 1004.72, "iva_v": 96.67, "store": "PONTE MILVIO", "source": "storico"}, {"id": "1259856", "data": "12/02/2026", "cons": "13/02/2026", "op": "Alessia De Simone", "tot": 1074.45, "lines": [{"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "um": "KG", "qta": 36.0, "prezzo": 8.3, "iva": 10, "importo": 298.8}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "um": "PZ", "qta": 6.0, "prezzo": 9.3, "iva": 4, "importo": 55.8}, {"desc": "LA PINATA CHEDDAR CHEESE SAUCE 6x3kg", "um": "PZ", "qta": 6.0, "prezzo": 16.0, "iva": 10, "importo": 96.0}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "um": "PZ", "qta": 4.0, "prezzo": 20.99, "iva": 4, "importo": 83.96}, {"desc": "HEINZ KETCHUP DIP POT 25G 100PZX1CT", "um": "PZ", "qta": 2.0, "prezzo": 13.22, "iva": 10, "importo": 26.44}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G (10pzx95g)", "um": "PZ", "qta": 14.0, "prezzo": 7.1, "iva": 10, "importo": 99.4}, {"desc": "CHICKEN NUGGETS CORNFLAKES 12X1KG (47pzX21g)", "um": "PZ", "qta": 12.0, "prezzo": 7.0, "iva": 10, "importo": 84.0}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 30.0, "prezzo": 8.0, "iva": 10, "importo": 240.0}], "imp": 984.4, "iva_v": 90.05, "store": "PONTE MILVIO", "source": "storico"}, {"id": "1260386", "data": "13/02/2026", "cons": "14/02/2026", "op": "Antonio Levante", "tot": 908.11, "lines": [{"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "um": "PZ", "qta": 6.0, "prezzo": 9.3, "iva": 4, "importo": 55.8}, {"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "um": "KG", "qta": 18.0, "prezzo": 8.3, "iva": 10, "importo": 149.4}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G (10pzx95g)", "um": "PZ", "qta": 14.0, "prezzo": 7.1, "iva": 10, "importo": 99.4}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "um": "PZ", "qta": 4.0, "prezzo": 7.2, "iva": 10, "importo": 28.8}, {"desc": "HEINZ SMOKEY BACONNAISE SQ. 6X1LT", "um": "PZ", "qta": 6.0, "prezzo": 6.0, "iva": 10, "importo": 36.0}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "um": "PZ", "qta": 16.0, "prezzo": 2.51, "iva": 10, "importo": 40.16}, {"desc": "CARTA BOBINA PRIME 168 (800STRAPPI)55949 2X1CNF", "um": "PZ", "qta": 4.0, "prezzo": 4.29, "iva": 22, "importo": 17.16}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 50.0, "prezzo": 8.0, "iva": 10, "importo": 400.0}], "imp": 826.72, "iva_v": 81.39, "store": "PONTE MILVIO", "source": "storico"}, {"id": "1260795", "data": "15/02/2026", "cons": "16/02/2026", "op": "Antonio Levante", "tot": 1418.02, "lines": [{"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "um": "KG", "qta": 54.0, "prezzo": 8.3, "iva": 10, "importo": 448.2}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "um": "PZ", "qta": 6.0, "prezzo": 9.3, "iva": 4, "importo": 55.8}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "um": "PZ", "qta": 3.0, "prezzo": 20.99, "iva": 4, "importo": 62.97}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G (10pzx95g)", "um": "PZ", "qta": 14.0, "prezzo": 7.1, "iva": 10, "importo": 99.4}, {"desc": "CHICKEN NUGGETS CORNFLAKES 12X1KG (47pzX21g)", "um": "PZ", "qta": 12.0, "prezzo": 7.0, "iva": 10, "importo": 84.0}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "um": "PZ", "qta": 8.0, "prezzo": 7.2, "iva": 10, "importo": 57.6}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "um": "PZ", "qta": 16.0, "prezzo": 2.51, "iva": 10, "importo": 40.16}, {"desc": "HEINZ SMOKEY BACONNAISE SQ. 6X1LT", "um": "PZ", "qta": 6.0, "prezzo": 6.0, "iva": 10, "importo": 36.0}, {"desc": "HEINZ MAIONESE DIP POT 25G 100PZX1CT", "um": "PZ", "qta": 2.0, "prezzo": 20.99, "iva": 10, "importo": 41.98}, {"desc": "LA PINATA CHEDDAR CHEESE SAUCE 6x3kg", "um": "PZ", "qta": 6.0, "prezzo": 16.0, "iva": 10, "importo": 96.0}, {"desc": "NANG-FAH SRIRACHA CHILI SAUCE 12x450ml", "um": "PZ", "qta": 12.0, "prezzo": 2.79, "iva": 10, "importo": 33.48}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 30.0, "prezzo": 8.0, "iva": 10, "importo": 240.0}], "imp": 1295.59, "iva_v": 122.43, "store": "PONTE MILVIO", "source": "storico"}, {"id": "1262136", "data": "17/02/2026", "cons": "18/02/2026", "op": "Antonio Levante", "tot": 1119.35, "lines": [{"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "um": "KG", "qta": 72.0, "prezzo": 8.3, "iva": 10, "importo": 597.6}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 10.0, "prezzo": 8.0, "iva": 10, "importo": 80.0}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "um": "PZ", "qta": 8.0, "prezzo": 7.2, "iva": 10, "importo": 57.6}, {"desc": "CARTA BOBINA PRIME 168 (800STRAPPI)55949 2X1CNF", "um": "PZ", "qta": 4.0, "prezzo": 4.29, "iva": 22, "importo": 17.16}, {"desc": "HEINZ SMOKEY BACONNAISE SQ. 6X1LT", "um": "PZ", "qta": 12.0, "prezzo": 6.0, "iva": 10, "importo": 72.0}, {"desc": "HEINZ MAIONESE PROFESSIONAL SECCHIELLO 5L", "um": "PZ", "qta": 2.0, "prezzo": 16.5, "iva": 10, "importo": 33.0}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "um": "PZ", "qta": 6.0, "prezzo": 9.3, "iva": 4, "importo": 55.8}, {"desc": "FRUFRU LAMPONE CONGELATI RIC. CIOCCOLATO 16X140G", "um": "PZ", "qta": 16.0, "prezzo": 3.3, "iva": 10, "importo": 52.8}, {"desc": "FRUFRU FRAGOLA CONGELATI RIC. CIOCCOLATO 16X140G", "um": "PZ", "qta": 16.0, "prezzo": 3.3, "iva": 10, "importo": 52.8}], "imp": 1018.76, "iva_v": 100.59, "store": "PONTE MILVIO", "source": "storico"}, {"id": "1263313", "data": "19/02/2026", "cons": "20/02/2026", "op": "Alessia De Simone", "tot": 819.21, "lines": [{"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "um": "KG", "qta": 18.0, "prezzo": 8.3, "iva": 10, "importo": 149.4}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "um": "PZ", "qta": 4.0, "prezzo": 20.99, "iva": 4, "importo": 83.96}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "um": "PZ", "qta": 6.0, "prezzo": 9.3, "iva": 4, "importo": 55.8}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "um": "PZ", "qta": 16.0, "prezzo": 2.51, "iva": 10, "importo": 40.16}, {"desc": "CHICKEN NUGGETS CORNFLAKES 12X1KG (47pzX21g)", "um": "PZ", "qta": 12.0, "prezzo": 7.0, "iva": 10, "importo": 84.0}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 40.0, "prezzo": 8.0, "iva": 10, "importo": 320.0}, {"desc": "CARTA BOBINA PRIME 168 (800STRAPPI)55949 2X1CNF", "um": "PZ", "qta": 4.0, "prezzo": 4.29, "iva": 22, "importo": 17.16}], "imp": 750.48, "iva_v": 68.73, "store": "PONTE MILVIO", "source": "storico"}, {"id": "1263884", "data": "20/02/2026", "cons": "21/02/2026", "op": "Antonio Levante", "tot": 983.19, "lines": [{"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "um": "KG", "qta": 27.0, "prezzo": 8.3, "iva": 10, "importo": 224.1}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "um": "PZ", "qta": 3.0, "prezzo": 20.99, "iva": 4, "importo": 62.97}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G (10pzx95g)", "um": "PZ", "qta": 14.0, "prezzo": 7.1, "iva": 10, "importo": 99.4}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "um": "PZ", "qta": 6.0, "prezzo": 9.3, "iva": 4, "importo": 55.8}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "um": "PZ", "qta": 4.0, "prezzo": 7.2, "iva": 10, "importo": 28.8}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 40.0, "prezzo": 8.0, "iva": 10, "importo": 320.0}, {"desc": "LA PINATA CHEDDAR CHEESE SAUCE 6x3kg", "um": "PZ", "qta": 6.0, "prezzo": 16.0, "iva": 10, "importo": 96.0}, {"desc": "HEINZ KETCHUP DIP POT 25G 100PZX1CT", "um": "PZ", "qta": 1.0, "prezzo": 13.22, "iva": 10, "importo": 13.22}], "imp": 900.29, "iva_v": 82.9, "store": "PONTE MILVIO", "source": "storico"}, {"id": "1264317", "data": "22/02/2026", "cons": "23/02/2026", "op": "Antonio Levante", "tot": 1525.86, "lines": [{"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 50.0, "prezzo": 8.0, "iva": 10, "importo": 400.0}, {"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "um": "KG", "qta": 45.0, "prezzo": 8.3, "iva": 10, "importo": 373.5}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "um": "PZ", "qta": 12.0, "prezzo": 9.3, "iva": 4, "importo": 111.6}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G (10pzx95g)", "um": "PZ", "qta": 14.0, "prezzo": 7.1, "iva": 10, "importo": 99.4}, {"desc": "CHICKEN NUGGETS CORNFLAKES 12X1KG (47pzX21g)", "um": "PZ", "qta": 12.0, "prezzo": 7.0, "iva": 10, "importo": 84.0}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "um": "PZ", "qta": 3.0, "prezzo": 20.99, "iva": 4, "importo": 62.97}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "um": "PZ", "qta": 8.0, "prezzo": 2.51, "iva": 10, "importo": 20.08}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "um": "PZ", "qta": 8.0, "prezzo": 7.2, "iva": 10, "importo": 57.6}, {"desc": "HEINZ SMOKEY BACONNAISE SQ. 6X1LT", "um": "PZ", "qta": 12.0, "prezzo": 6.0, "iva": 10, "importo": 72.0}, {"desc": "SCIROPPO D'ACERO PURO 12X250ML", "um": "PZ", "qta": 12.0, "prezzo": 5.25, "iva": 10, "importo": 63.0}, {"desc": "NANG-FAH SRIRACHA CHILI SAUCE 12x450ml", "um": "PZ", "qta": 12.0, "prezzo": 2.79, "iva": 10, "importo": 33.48}, {"desc": "CARTA BOBINA PRIME 168 (800STRAPPI)55949 2X1CNF", "um": "PZ", "qta": 4.0, "prezzo": 4.29, "iva": 22, "importo": 17.16}], "imp": 1394.79, "iva_v": 131.07, "store": "PONTE MILVIO", "source": "storico"}, {"id": "1255415", "data": "03/02/2026", "cons": "04/02/2026", "op": "Antonio Levante", "tot": 1757.21, "lines": [{"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 40.0, "prezzo": 8.0, "iva": 10, "importo": 320.0}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "um": "PZ", "qta": 3.0, "prezzo": 20.99, "iva": 4, "importo": 62.97}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "um": "PZ", "qta": 12.0, "prezzo": 9.3, "iva": 4, "importo": 111.6}, {"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "um": "KG", "qta": 108.0, "prezzo": 8.3, "iva": 10, "importo": 896.4}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G", "um": "PZ", "qta": 14.0, "prezzo": 7.1, "iva": 10, "importo": 99.4}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "um": "PZ", "qta": 16.0, "prezzo": 2.51, "iva": 10, "importo": 40.16}, {"desc": "HEINZ BARBECUE SAUCE 2X2.15L", "um": "PZ", "qta": 2.0, "prezzo": 9.5, "iva": 10, "importo": 19.0}, {"desc": "CARTA BOBINA PRIME 168 (800STRAPPI) 2X1CNF", "um": "PZ", "qta": 4.0, "prezzo": 4.5, "iva": 22, "importo": 18.0}, {"desc": "SAUCE CUP 2oz PP 20x50pz (60ml)", "um": "PZ", "qta": 20.0, "prezzo": 1.69, "iva": 22, "importo": 33.8}], "imp": 1601.33, "iva_v": 155.88, "store": "TUSCOLANA", "source": "storico"}, {"id": "1256534", "data": "05/02/2026", "cons": "06/02/2026", "op": "Antonio Levante", "tot": 997.45, "lines": [{"desc": "CHICKEN BURGER CORNFLAKES 14X950G", "um": "PZ", "qta": 14.0, "prezzo": 7.1, "iva": 10, "importo": 99.4}, {"desc": "CHICKEN NUGGETS CORNFLAKES 12X1KG", "um": "PZ", "qta": 12.0, "prezzo": 7.0, "iva": 10, "importo": 84.0}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "um": "PZ", "qta": 4.0, "prezzo": 7.2, "iva": 10, "importo": 28.8}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "um": "PZ", "qta": 2.0, "prezzo": 20.99, "iva": 4, "importo": 41.98}, {"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "um": "KG", "qta": 36.0, "prezzo": 8.3, "iva": 10, "importo": 298.8}, {"desc": "LA PINATA CHEDDAR CHEESE SAUCE 6x3kg", "um": "PZ", "qta": 6.0, "prezzo": 16.0, "iva": 10, "importo": 96.0}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "um": "PZ", "qta": 8.0, "prezzo": 2.51, "iva": 10, "importo": 20.08}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 30.0, "prezzo": 8.0, "iva": 10, "importo": 240.0}], "imp": 909.06, "iva_v": 88.39, "store": "TUSCOLANA", "source": "storico"}, {"id": "1256875", "data": "06/02/2026", "cons": "07/02/2026", "op": "Stella Lopes Sousa", "tot": 893.58, "lines": [{"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "um": "PZ", "qta": 12.0, "prezzo": 9.3, "iva": 4, "importo": 111.6}, {"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "um": "KG", "qta": 36.0, "prezzo": 8.3, "iva": 10, "importo": 298.8}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 20.0, "prezzo": 8.0, "iva": 10, "importo": 160.0}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "um": "PZ", "qta": 8.0, "prezzo": 7.2, "iva": 10, "importo": 57.6}, {"desc": "HEINZ SMOKEY BACONNAISE SQ. 6X1LT", "um": "PZ", "qta": 12.0, "prezzo": 6.0, "iva": 10, "importo": 72.0}, {"desc": "CARTA BOBINA PRIME 168 (800STRAPPI) 2X1CNF", "um": "PZ", "qta": 4.0, "prezzo": 4.29, "iva": 22, "importo": 17.16}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G", "um": "PZ", "qta": 14.0, "prezzo": 7.1, "iva": 10, "importo": 99.4}], "imp": 816.56, "iva_v": 77.02, "store": "TUSCOLANA", "source": "storico"}, {"id": "1257374", "data": "08/02/2026", "cons": "09/02/2026", "op": "Antonio Levante", "tot": 1413.03, "lines": [{"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "um": "KG", "qta": 54.0, "prezzo": 8.3, "iva": 10, "importo": 448.2}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "um": "PZ", "qta": 3.0, "prezzo": 20.99, "iva": 4, "importo": 62.97}, {"desc": "CHICKEN NUGGETS CORNFLAKES 12X1KG", "um": "PZ", "qta": 12.0, "prezzo": 7.0, "iva": 10, "importo": 84.0}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G", "um": "PZ", "qta": 14.0, "prezzo": 7.1, "iva": 10, "importo": 99.4}, {"desc": "LA PINATA CHEDDAR CHEESE SAUCE 6x3kg", "um": "PZ", "qta": 6.0, "prezzo": 16.0, "iva": 10, "importo": 96.0}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "um": "PZ", "qta": 6.0, "prezzo": 9.3, "iva": 4, "importo": 55.8}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 40.0, "prezzo": 8.0, "iva": 10, "importo": 320.0}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "um": "PZ", "qta": 8.0, "prezzo": 2.51, "iva": 10, "importo": 20.08}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "um": "PZ", "qta": 8.0, "prezzo": 7.2, "iva": 10, "importo": 57.6}, {"desc": "CARTA BOBINA PRIME 168 (800STRAPPI) 2X1CNF", "um": "PZ", "qta": 2.0, "prezzo": 4.29, "iva": 22, "importo": 8.58}, {"desc": "SAUCE CUP 2oz PP 20x50pz (60ml)", "um": "PZ", "qta": 20.0, "prezzo": 1.69, "iva": 22, "importo": 33.8}], "imp": 1286.43, "iva_v": 126.6, "store": "TUSCOLANA", "source": "storico"}, {"id": "1258764", "data": "10/02/2026", "cons": "11/02/2026", "op": "Antonio Levante", "tot": 967.97, "lines": [{"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "um": "KG", "qta": 54.0, "prezzo": 8.3, "iva": 10, "importo": 448.2}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 30.0, "prezzo": 8.0, "iva": 10, "importo": 240.0}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "um": "PZ", "qta": 2.0, "prezzo": 20.99, "iva": 4, "importo": 41.98}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "um": "PZ", "qta": 8.0, "prezzo": 2.51, "iva": 10, "importo": 20.08}, {"desc": "HEINZ SMOKEY BACONNAISE SQ. 6X1LT", "um": "PZ", "qta": 6.0, "prezzo": 6.0, "iva": 10, "importo": 36.0}, {"desc": "LA PINATA CHEDDAR CHEESE SAUCE 6x3kg", "um": "PZ", "qta": 6.0, "prezzo": 16.0, "iva": 10, "importo": 96.0}], "imp": 882.26, "iva_v": 85.71, "store": "TUSCOLANA", "source": "storico"}, {"id": "1259850", "data": "12/02/2026", "cons": "13/02/2026", "op": "Alessia De Simone", "tot": 873.81, "lines": [{"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "um": "PZ", "qta": 6.0, "prezzo": 9.3, "iva": 4, "importo": 55.8}, {"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "um": "KG", "qta": 36.0, "prezzo": 8.3, "iva": 10, "importo": 298.8}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "um": "PZ", "qta": 4.0, "prezzo": 7.2, "iva": 10, "importo": 28.8}, {"desc": "HEINZ MAIONESE PROFESSIONAL SECCHIELLO 5L", "um": "PZ", "qta": 2.0, "prezzo": 16.5, "iva": 10, "importo": 33.0}, {"desc": "HEINZ MAIONESE DIP POT 25G 100PZX1CT", "um": "PZ", "qta": 2.0, "prezzo": 20.99, "iva": 10, "importo": 41.98}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 40.0, "prezzo": 8.0, "iva": 10, "importo": 320.0}, {"desc": "CARTA BOBINA PRIME 168 (800STRAPPI)55949 2X1CNF", "um": "PZ", "qta": 4.0, "prezzo": 4.29, "iva": 22, "importo": 17.16}], "imp": 795.54, "iva_v": 78.27, "store": "TUSCOLANA", "source": "storico"}, {"id": "1260382", "data": "13/02/2026", "cons": "14/02/2026", "op": "Antonio Levante", "tot": 1227.42, "lines": [{"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "um": "PZ", "qta": 8.0, "prezzo": 2.51, "iva": 10, "importo": 20.08}, {"desc": "HEINZ SMOKEY BACONNAISE SQ. 6X1LT", "um": "PZ", "qta": 6.0, "prezzo": 6.0, "iva": 10, "importo": 36.0}, {"desc": "LA PINATA CHEDDAR CHEESE SAUCE 6x3kg", "um": "PZ", "qta": 6.0, "prezzo": 16.0, "iva": 10, "importo": 96.0}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G (10pzx95g)", "um": "PZ", "qta": 14.0, "prezzo": 7.1, "iva": 10, "importo": 99.4}, {"desc": "CHICKEN NUGGETS CORNFLAKES 12X1KG (47pzX21g)", "um": "PZ", "qta": 12.0, "prezzo": 7.0, "iva": 10, "importo": 84.0}, {"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "um": "KG", "qta": 36.0, "prezzo": 8.3, "iva": 10, "importo": 298.8}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "um": "PZ", "qta": 6.0, "prezzo": 9.3, "iva": 4, "importo": 55.8}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "um": "PZ", "qta": 4.0, "prezzo": 7.2, "iva": 10, "importo": 28.8}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 50.0, "prezzo": 8.0, "iva": 10, "importo": 400.0}], "imp": 1118.88, "iva_v": 108.54, "store": "TUSCOLANA", "source": "storico"}, {"id": "1260794", "data": "15/02/2026", "cons": "16/02/2026", "op": "Antonio Levante", "tot": 1285.37, "lines": [{"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "um": "KG", "qta": 36.0, "prezzo": 8.3, "iva": 10, "importo": 298.8}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "um": "PZ", "qta": 12.0, "prezzo": 9.3, "iva": 4, "importo": 111.6}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "um": "PZ", "qta": 3.0, "prezzo": 20.99, "iva": 4, "importo": 62.97}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G (10pzx95g)", "um": "PZ", "qta": 14.0, "prezzo": 7.1, "iva": 10, "importo": 99.4}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "um": "PZ", "qta": 8.0, "prezzo": 7.2, "iva": 10, "importo": 57.6}, {"desc": "HEINZ SMOKEY BACONNAISE SQ. 6X1LT", "um": "PZ", "qta": 12.0, "prezzo": 6.0, "iva": 10, "importo": 72.0}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "um": "PZ", "qta": 16.0, "prezzo": 2.51, "iva": 10, "importo": 40.16}, {"desc": "HEINZ BARBECUE SAUCE 2X2.15L", "um": "PZ", "qta": 2.0, "prezzo": 9.5, "iva": 10, "importo": 19.0}, {"desc": "NANG-FAH SRIRACHA CHILI SAUCE 12x450ml", "um": "PZ", "qta": 12.0, "prezzo": 2.79, "iva": 10, "importo": 33.48}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 35.0, "prezzo": 8.0, "iva": 10, "importo": 280.0}, {"desc": "CHICKEN NUGGETS CORNFLAKES 12X1KG (47pzX21g)", "um": "PZ", "qta": 12.0, "prezzo": 7.0, "iva": 10, "importo": 84.0}, {"desc": "CARTA BOBINA PRIME 168 (800STRAPPI)55949 2X1CNF", "um": "PZ", "qta": 4.0, "prezzo": 4.29, "iva": 22, "importo": 17.16}], "imp": 1176.17, "iva_v": 109.2, "store": "TUSCOLANA", "source": "storico"}, {"id": "1262130", "data": "17/02/2026", "cons": "18/02/2026", "op": "Antonio Levante", "tot": 1080.61, "lines": [{"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "um": "KG", "qta": 54.0, "prezzo": 8.3, "iva": 10, "importo": 448.2}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G (10pzx95g)", "um": "PZ", "qta": 14.0, "prezzo": 7.1, "iva": 10, "importo": 99.4}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "um": "PZ", "qta": 16.0, "prezzo": 2.51, "iva": 10, "importo": 40.16}, {"desc": "HEINZ MAIONESE PROFESSIONAL SECCHIELLO 5L", "um": "PZ", "qta": 2.0, "prezzo": 16.5, "iva": 10, "importo": 33.0}, {"desc": "HEINZ MAIONESE DIP POT 25G 100PZX1CT", "um": "PZ", "qta": 2.0, "prezzo": 20.99, "iva": 10, "importo": 41.98}, {"desc": "HEINZ BARBECUE SAUCE 2X2.15L", "um": "PZ", "qta": 2.0, "prezzo": 9.5, "iva": 10, "importo": 19.0}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 10.0, "prezzo": 8.0, "iva": 10, "importo": 80.0}, {"desc": "CARTA BOBINA PRIME 168 (800STRAPPI)55949 2X1CNF", "um": "PZ", "qta": 4.0, "prezzo": 4.29, "iva": 22, "importo": 17.16}, {"desc": "LA PINATA CHEDDAR CHEESE SAUCE 6x3kg", "um": "PZ", "qta": 6.0, "prezzo": 16.0, "iva": 10, "importo": 96.0}, {"desc": "FRUFRU LAMPONE CONGELATI RIC. CIOCCOLATO 16X140G", "um": "PZ", "qta": 16.0, "prezzo": 3.3, "iva": 10, "importo": 52.8}, {"desc": "FRUFRU FRAGOLA CONGELATI RIC. CIOCCOLATO 16X140G", "um": "PZ", "qta": 16.0, "prezzo": 3.3, "iva": 10, "importo": 52.8}], "imp": 980.5, "iva_v": 100.11, "store": "TUSCOLANA", "source": "storico"}, {"id": "1263299", "data": "19/02/2026", "cons": "20/02/2026", "op": "Alessia De Simone", "tot": 485.55, "lines": [{"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "um": "PZ", "qta": 2.0, "prezzo": 20.99, "iva": 4, "importo": 41.98}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "um": "PZ", "qta": 4.0, "prezzo": 7.2, "iva": 10, "importo": 28.8}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "um": "PZ", "qta": 16.0, "prezzo": 2.51, "iva": 10, "importo": 40.16}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "um": "PZ", "qta": 6.0, "prezzo": 9.3, "iva": 4, "importo": 55.8}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 35.0, "prezzo": 8.0, "iva": 10, "importo": 280.0}], "imp": 446.74, "iva_v": 38.81, "store": "TUSCOLANA", "source": "storico"}, {"id": "1263880", "data": "20/02/2026", "cons": "21/02/2026", "op": "Antonio Levante", "tot": 873.93, "lines": [{"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "um": "KG", "qta": 36.0, "prezzo": 8.3, "iva": 10, "importo": 298.8}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "um": "PZ", "qta": 6.0, "prezzo": 9.3, "iva": 4, "importo": 55.8}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "um": "PZ", "qta": 4.0, "prezzo": 7.2, "iva": 10, "importo": 28.8}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "um": "PZ", "qta": 2.0, "prezzo": 20.99, "iva": 4, "importo": 41.98}, {"desc": "LA PINATA CHEDDAR CHEESE SAUCE 6x3kg", "um": "PZ", "qta": 6.0, "prezzo": 16.0, "iva": 10, "importo": 96.0}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "qta": 20.0, "prezzo": 8.0, "iva": 10, "importo": 160.0}, {"desc": "CARTA BOBINA PRIME 168 (800STRAPPI)55949 2X1CNF", "um": "PZ", "qta": 4.0, "prezzo": 4.29, "iva": 22, "importo": 17.16}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G (10pzx95g)", "um": "PZ", "qta": 14.0, "prezzo": 7.1, "iva": 10, "importo": 99.4}], "imp": 797.94, "iva_v": 75.99, "store": "TUSCOLANA", "source": "storico"}],
+  weekly: {"TRASTEVERE": [{"header": "Settimana 1: 01\u201307 febbraio   |   5 ordini: 1254017, 1255389, 1256021, 1256533, 1256869", "orders_info": "", "products": [{"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "norm": "", "qta": 252.0, "um": "KG", "pm": 8.3, "tot": 2091.6, "nd": 3, "note": ""}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "norm": "", "qta": 170.0, "um": "PZ", "pm": 8.0, "tot": 1360.0, "nd": 5, "note": ""}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G", "norm": "", "qta": 56.0, "um": "PZ", "pm": 7.1, "tot": 397.6, "nd": 4, "note": ""}, {"desc": "LA PINATA CHEDDAR CHEESE SAUCE 6x3kg", "norm": "", "qta": 18.0, "um": "PZ", "pm": 16.0, "tot": 288.0, "nd": 3, "note": ""}, {"desc": "HEINZ SMOKEY BACONNAISE SQ. 6X1LT", "norm": "", "qta": 42.0, "um": "PZ", "pm": 6.13, "tot": 256.68, "nd": 3, "note": "\u26a0 prezzi diversi: \u20ac6 / \u20ac6.39"}, {"desc": "HEINZ MAIONESE PROFESSIONAL SECCHIELLO 5L", "norm": "", "qta": 12.0, "um": "PZ", "pm": 16.15, "tot": 193.8, "nd": 2, "note": ""}, {"desc": "CHICKEN NUGGETS CORNFLAKES 12X1KG", "norm": "", "qta": 24.0, "um": "PZ", "pm": 7.0, "tot": 168.0, "nd": 2, "note": ""}, {"desc": "BURGERSLICES W/RED CHEDDAR 9X1,082KG/88PZ 60%", "norm": "", "qta": 18.0, "um": "PZ", "pm": 9.3, "tot": 167.4, "nd": 2, "note": ""}, {"desc": "FABBRI SIMPLE' BASEGEL 8x1500g", "norm": "", "qta": 8.0, "um": "PZ", "pm": 18.38, "tot": 147.04, "nd": 1, "note": ""}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "norm": "", "qta": 20.0, "um": "PZ", "pm": 7.2, "tot": 144.0, "nd": 3, "note": ""}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "norm": "", "qta": 56.0, "um": "PZ", "pm": 2.51, "tot": 140.56, "nd": 4, "note": ""}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "norm": "", "qta": 6.0, "um": "PZ", "pm": 20.99, "tot": 125.94, "nd": 3, "note": ""}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "norm": "", "qta": 12.0, "um": "PZ", "pm": 9.3, "tot": 111.6, "nd": 2, "note": ""}, {"desc": "SCIROPPO D'ACERO PURO 12X250ML", "norm": "", "qta": 12.0, "um": "PZ", "pm": 5.25, "tot": 63.0, "nd": 1, "note": ""}, {"desc": "HEINZ KETCHUP PAIL 5.7kg", "norm": "", "qta": 4.0, "um": "PZ", "pm": 14.37, "tot": 57.48, "nd": 2, "note": ""}, {"desc": "HEINZ MAIONESE DIP POT 25G 100PZX1CT", "norm": "", "qta": 2.0, "um": "PZ", "pm": 20.99, "tot": 41.98, "nd": 1, "note": ""}, {"desc": "HEINZ BARBECUE SAUCE 2X2.15L", "norm": "", "qta": 4.0, "um": "PZ", "pm": 8.9, "tot": 35.6, "nd": 1, "note": ""}, {"desc": "CARTA BOBINA PRIME 168 (800STRAPPI) 2X1CNF", "norm": "", "qta": 8.0, "um": "PZ", "pm": 4.395, "tot": 35.16, "nd": 2, "note": "\u26a0 prezzi diversi: \u20ac4.29 / \u20ac4.5"}, {"desc": "SAUCE CUP 2oz PP 20x50pz (60ml)", "norm": "", "qta": 20.0, "um": "PZ", "pm": 1.69, "tot": 33.8, "nd": 1, "note": ""}, {"desc": "HEINZ KETCHUP DIP POT 25G 100PZX1CT", "norm": "", "qta": 2.0, "um": "PZ", "pm": 13.22, "tot": 26.44, "nd": 1, "note": ""}], "total": 0}, {"header": "Settimana 2: 08\u201314 febbraio   |   4 ordini: 1257372, 1258752, 1259852, 1260385", "orders_info": "", "products": [{"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "norm": "", "qta": 216.0, "um": "KG", "pm": 8.3, "tot": 1792.8, "nd": 4, "note": ""}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "norm": "", "qta": 185.0, "um": "PZ", "pm": 8.0, "tot": 1480.0, "nd": 4, "note": ""}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G", "norm": "", "qta": 42.0, "um": "PZ", "pm": 7.1, "tot": 298.2, "nd": 3, "note": "Nomi orig. diversi: CHICKEN BURGER CORNFLAKES 14X950G / CHICKEN BURGER CORNFLAKES 14X950G (10pzx95g)"}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "norm": "", "qta": 30.0, "um": "PZ", "pm": 9.3, "tot": 279.0, "nd": 4, "note": ""}, {"desc": "LA PINATA CHEDDAR CHEESE SAUCE 6x3kg", "norm": "", "qta": 12.0, "um": "PZ", "pm": 16.0, "tot": 192.0, "nd": 2, "note": ""}, {"desc": "CHICKEN NUGGETS CORNFLAKES 12X1KG", "norm": "", "qta": 24.0, "um": "PZ", "pm": 7.0, "tot": 168.0, "nd": 2, "note": "Nomi orig. diversi: CHICKEN NUGGETS CORNFLAKES 12X1KG / CHICKEN NUGGETS CORNFLAKES 12X1KG (47pzX21g)"}, {"desc": "HEINZ MAIONESE PROFESSIONAL SECCHIELLO 5L", "norm": "", "qta": 10.0, "um": "PZ", "pm": 16.5, "tot": 165.0, "nd": 2, "note": ""}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "norm": "", "qta": 20.0, "um": "PZ", "pm": 7.2, "tot": 144.0, "nd": 4, "note": ""}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "norm": "", "qta": 48.0, "um": "PZ", "pm": 2.51, "tot": 120.48, "nd": 4, "note": ""}, {"desc": "HEINZ KETCHUP PAIL 5.7kg", "norm": "", "qta": 6.0, "um": "PZ", "pm": 14.99, "tot": 89.94, "nd": 1, "note": ""}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "norm": "", "qta": 4.0, "um": "PZ", "pm": 20.99, "tot": 83.96, "nd": 2, "note": ""}, {"desc": "HEINZ MAIONESE DIP POT 25G 100PZX1CT", "norm": "", "qta": 2.0, "um": "PZ", "pm": 20.99, "tot": 41.98, "nd": 1, "note": ""}, {"desc": "HEINZ BARBECUE SAUCE 2X2.15L", "norm": "", "qta": 4.0, "um": "PZ", "pm": 9.5, "tot": 38.0, "nd": 1, "note": ""}, {"desc": "HEINZ SMOKEY BACONNAISE SQ. 6X1LT", "norm": "", "qta": 6.0, "um": "PZ", "pm": 6.0, "tot": 36.0, "nd": 1, "note": ""}, {"desc": "SAUCE CUP 2oz PP 20x50pz (60ml)", "norm": "", "qta": 20.0, "um": "PZ", "pm": 1.69, "tot": 33.8, "nd": 1, "note": ""}, {"desc": "HEINZ KETCHUP DIP POT 25G 100PZX1CT", "norm": "", "qta": 2.0, "um": "PZ", "pm": 13.22, "tot": 26.44, "nd": 1, "note": ""}, {"desc": "CARTA BOBINA PRIME 168 (800STRAPPI) 2X1CNF", "norm": "", "qta": 6.0, "um": "PZ", "pm": 4.29, "tot": 25.74, "nd": 2, "note": "Nomi orig. diversi: CARTA BOBINA PRIME 168 (800STRAPPI) 2X1CNF / CARTA BOBINA PRIME 168 (800STRAPPI)55949 2X1CNF"}], "total": 0}, {"header": "Settimana 3: 15\u201321 febbraio   |   4 ordini: 1260796, 1262127, 1263297, 1263886", "orders_info": "", "products": [{"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "norm": "", "qta": 234.0, "um": "KG", "pm": 8.3, "tot": 1942.2, "nd": 4, "note": ""}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "norm": "", "qta": 185.0, "um": "PZ", "pm": 8.0, "tot": 1480.0, "nd": 4, "note": ""}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "norm": "", "qta": 36.0, "um": "PZ", "pm": 9.3, "tot": 334.8, "nd": 4, "note": ""}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G (10pzx95g)", "norm": "CHICKEN BURGER CORNFLAKES 14X950G", "qta": 42.0, "um": "PZ", "pm": 7.1, "tot": 298.2, "nd": 3, "note": ""}, {"desc": "LA PINATA CHEDDAR CHEESE SAUCE 6x3kg", "norm": "", "qta": 12.0, "um": "PZ", "pm": 16.0, "tot": 192.0, "nd": 1, "note": ""}, {"desc": "HEINZ SMOKEY BACONNAISE SQ. 6X1LT", "norm": "", "qta": 30.0, "um": "PZ", "pm": 6.0, "tot": 180.0, "nd": 3, "note": ""}, {"desc": "CHICKEN NUGGETS CORNFLAKES 12X1KG (47pzX21g)", "norm": "CHICKEN NUGGETS CORNFLAKES 12X1KG", "qta": 24.0, "um": "PZ", "pm": 7.0, "tot": 168.0, "nd": 2, "note": ""}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "norm": "", "qta": 8.0, "um": "PZ", "pm": 20.99, "tot": 167.92, "nd": 3, "note": ""}, {"desc": "HEINZ MAIONESE PROFESSIONAL SECCHIELLO 5L", "norm": "", "qta": 10.0, "um": "PZ", "pm": 16.5, "tot": 165.0, "nd": 2, "note": ""}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "norm": "", "qta": 16.0, "um": "PZ", "pm": 7.2, "tot": 115.2, "nd": 3, "note": ""}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "norm": "", "qta": 40.0, "um": "PZ", "pm": 2.51, "tot": 100.4, "nd": 3, "note": ""}, {"desc": "HEINZ MAIONESE DIP POT 25G 100PZX1CT", "norm": "", "qta": 2.0, "um": "PZ", "pm": 20.99, "tot": 41.98, "nd": 1, "note": ""}, {"desc": "HEINZ BARBECUE SAUCE 2X2.15L", "norm": "", "qta": 4.0, "um": "PZ", "pm": 9.5, "tot": 38.0, "nd": 2, "note": ""}, {"desc": "CARTA BOBINA PRIME 168 (800STRAPPI)55949 2X1CNF", "norm": "CARTA BOBINA PRIME 168 (800STRAPPI) 2X1CNF", "qta": 8.0, "um": "PZ", "pm": 4.29, "tot": 34.32, "nd": 3, "note": ""}, {"desc": "NANG-FAH SRIRACHA CHILI SAUCE 12x450ml", "norm": "", "qta": 12.0, "um": "PZ", "pm": 2.79, "tot": 33.48, "nd": 1, "note": ""}, {"desc": "HEINZ KETCHUP DIP POT 25G 100PZX1CT", "norm": "", "qta": 2.0, "um": "PZ", "pm": 13.22, "tot": 26.44, "nd": 1, "note": ""}], "total": 0}, {"header": "Settimana 4: 22\u201328 febbraio", "orders_info": "", "products": [{"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "norm": "", "qta": 702.0, "um": "KG", "pm": 8.3, "tot": 5826.6, "nd": 11, "note": "Settimane: S1, S2, S3"}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "norm": "", "qta": 540.0, "um": "PZ", "pm": 8.0, "tot": 4320.0, "nd": 13, "note": "Settimane: S1, S2, S3"}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G", "norm": "", "qta": 140.0, "um": "PZ", "pm": 7.1, "tot": 994.0, "nd": 10, "note": "Nomi: CHICKEN BURGER CORNFLAKES 14X950G / CHICKEN BURGER CORNFLAKES 14X950G (10pzx95g) | Settimane: S1, S2, S3"}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "norm": "", "qta": 78.0, "um": "PZ", "pm": 9.3, "tot": 725.4, "nd": 10, "note": "Settimane: S1, S2, S3"}, {"desc": "LA PINATA CHEDDAR CHEESE SAUCE 6x3kg", "norm": "", "qta": 42.0, "um": "PZ", "pm": 16.0, "tot": 672.0, "nd": 6, "note": "Settimane: S1, S2, S3"}, {"desc": "HEINZ MAIONESE PROFESSIONAL SECCHIELLO 5L", "norm": "", "qta": 32.0, "um": "PZ", "pm": 16.383, "tot": 523.8, "nd": 6, "note": "\u26a0 prezzi: \u20ac16.15 / \u20ac16.5 | Settimane: S1, S2, S3"}, {"desc": "CHICKEN NUGGETS CORNFLAKES 12X1KG", "norm": "", "qta": 72.0, "um": "PZ", "pm": 7.0, "tot": 504.0, "nd": 6, "note": "Nomi: CHICKEN NUGGETS CORNFLAKES 12X1KG / CHICKEN NUGGETS CORNFLAKES 12X1KG (47pzX21g) | Settimane: S1, S2, S3"}, {"desc": "HEINZ SMOKEY BACONNAISE SQ. 6X1LT", "norm": "", "qta": 78.0, "um": "PZ", "pm": 6.056, "tot": 472.68, "nd": 7, "note": "\u26a0 prezzi: \u20ac6 / \u20ac6.39 | Settimane: S1, S2, S3"}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "norm": "", "qta": 56.0, "um": "PZ", "pm": 7.2, "tot": 403.2, "nd": 10, "note": "Settimane: S1, S2, S3"}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "norm": "", "qta": 18.0, "um": "PZ", "pm": 20.99, "tot": 377.82, "nd": 8, "note": "Settimane: S1, S2, S3"}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "norm": "", "qta": 144.0, "um": "PZ", "pm": 2.51, "tot": 361.44, "nd": 11, "note": "Settimane: S1, S2, S3"}, {"desc": "BURGERSLICES W/RED CHEDDAR 9X1,082KG/88PZ 60%", "norm": "", "qta": 18.0, "um": "PZ", "pm": 9.3, "tot": 167.4, "nd": 2, "note": "Settimane: S1"}, {"desc": "HEINZ KETCHUP PAIL 5.7kg", "norm": "", "qta": 10.0, "um": "PZ", "pm": 14.577, "tot": 147.42, "nd": 3, "note": "\u26a0 prezzi: \u20ac14.37 / \u20ac14.99 | Settimane: S1, S2"}, {"desc": "FABBRI SIMPLE' BASEGEL 8x1500g", "norm": "", "qta": 8.0, "um": "PZ", "pm": 18.38, "tot": 147.04, "nd": 1, "note": "Settimane: S1"}, {"desc": "HEINZ MAIONESE DIP POT 25G 100PZX1CT", "norm": "", "qta": 6.0, "um": "PZ", "pm": 20.99, "tot": 125.94, "nd": 3, "note": "Settimane: S1, S2, S3"}, {"desc": "HEINZ BARBECUE SAUCE 2X2.15L", "norm": "", "qta": 12.0, "um": "PZ", "pm": 9.35, "tot": 111.6, "nd": 4, "note": "\u26a0 prezzi: \u20ac8.9 / \u20ac9.5 | Settimane: S1, S2, S3"}, {"desc": "CARTA BOBINA PRIME 168 (800STRAPPI) 2X1CNF", "norm": "", "qta": 22.0, "um": "PZ", "pm": 4.32, "tot": 95.22, "nd": 7, "note": "Nomi: CARTA BOBINA PRIME 168 (800STRAPPI) 2X1CNF / CARTA BOBINA PRIME 168 (800STRAPPI)55949 2X1CNF | \u26a0 prezzi: \u20ac4.29 / \u20ac4.5 | Settimane: S1, S2, S3"}, {"desc": "HEINZ KETCHUP DIP POT 25G 100PZX1CT", "norm": "", "qta": 6.0, "um": "PZ", "pm": 13.22, "tot": 79.32, "nd": 3, "note": "Settimane: S1, S2, S3"}, {"desc": "SAUCE CUP 2oz PP 20x50pz (60ml)", "norm": "", "qta": 40.0, "um": "PZ", "pm": 1.69, "tot": 67.6, "nd": 2, "note": "Settimane: S1, S2"}, {"desc": "SCIROPPO D'ACERO PURO 12X250ML", "norm": "", "qta": 12.0, "um": "PZ", "pm": 5.25, "tot": 63.0, "nd": 1, "note": "Settimane: S1"}, {"desc": "NANG-FAH SRIRACHA CHILI SAUCE 12x450ml", "norm": "", "qta": 12.0, "um": "PZ", "pm": 2.79, "tot": 33.48, "nd": 1, "note": "Settimane: S3"}], "total": 0}], "PIAZZA ISTRIA": [{"header": "Settimana 1: 01\u201307 febbraio   |   3 ordini: 1255417, 1256539, 1256928", "orders_info": "", "products": [{"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "norm": "", "qta": 207.0, "um": "KG", "pm": 8.3, "tot": 1718.1, "nd": 3, "note": ""}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "norm": "", "qta": 135.0, "um": "PZ", "pm": 8.0, "tot": 1080.0, "nd": 3, "note": ""}, {"desc": "LA PINATA CHEDDAR CHEESE SAUCE 6x3kg", "norm": "", "qta": 12.0, "um": "PZ", "pm": 16.0, "tot": 192.0, "nd": 2, "note": ""}, {"desc": "CHICKEN NUGGETS CORNFLAKES 12X1KG", "norm": "", "qta": 24.0, "um": "PZ", "pm": 7.0, "tot": 168.0, "nd": 2, "note": ""}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "norm": "", "qta": 18.0, "um": "PZ", "pm": 9.3, "tot": 167.4, "nd": 2, "note": ""}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "norm": "", "qta": 7.0, "um": "PZ", "pm": 20.99, "tot": 146.93, "nd": 3, "note": ""}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G", "norm": "", "qta": 14.0, "um": "PZ", "pm": 7.1, "tot": 99.4, "nd": 1, "note": ""}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "norm": "", "qta": 24.0, "um": "PZ", "pm": 2.51, "tot": 60.24, "nd": 2, "note": ""}, {"desc": "HEINZ SMOKEY BACONNAISE SQ. 6X1LT", "norm": "", "qta": 6.0, "um": "PZ", "pm": 6.0, "tot": 36.0, "nd": 1, "note": ""}, {"desc": "CARTA BOBINA PRIME 168 (800STRAPPI) 2X1CNF", "norm": "", "qta": 8.0, "um": "PZ", "pm": 4.29, "tot": 34.32, "nd": 2, "note": ""}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "norm": "", "qta": 4.0, "um": "PZ", "pm": 7.2, "tot": 28.8, "nd": 1, "note": ""}, {"desc": "HEINZ MAIONESE DIP POT 25G 100PZX1CT", "norm": "", "qta": 1.0, "um": "PZ", "pm": 20.99, "tot": 20.99, "nd": 1, "note": ""}, {"desc": "HEINZ BARBECUE SAUCE 2X2.15L", "norm": "", "qta": 2.0, "um": "PZ", "pm": 9.5, "tot": 19.0, "nd": 1, "note": ""}], "total": 0}, {"header": "Settimana 2: 08\u201314 febbraio   |   4 ordini: 1257373, 1258755, 1259845, 1260378", "orders_info": "", "products": [{"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "norm": "", "qta": 207.0, "um": "KG", "pm": 8.3, "tot": 1718.1, "nd": 4, "note": ""}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "norm": "", "qta": 185.0, "um": "PZ", "pm": 8.0, "tot": 1480.0, "nd": 4, "note": ""}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G", "norm": "", "qta": 56.0, "um": "PZ", "pm": 7.1, "tot": 397.6, "nd": 4, "note": "Nomi orig. diversi: CHICKEN BURGER CORNFLAKES 14X950G / CHICKEN BURGER CORNFLAKES 14X950G (10pzx95g)"}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "norm": "", "qta": 30.0, "um": "PZ", "pm": 9.3, "tot": 279.0, "nd": 4, "note": ""}, {"desc": "HEINZ SMOKEY BACONNAISE SQ. 6X1LT", "norm": "", "qta": 42.0, "um": "PZ", "pm": 6.0, "tot": 252.0, "nd": 3, "note": ""}, {"desc": "CHICKEN NUGGETS CORNFLAKES 12X1KG", "norm": "", "qta": 36.0, "um": "PZ", "pm": 7.0, "tot": 252.0, "nd": 3, "note": "Nomi orig. diversi: CHICKEN NUGGETS CORNFLAKES 12X1KG / CHICKEN NUGGETS CORNFLAKES 12X1KG (47pzX21g)"}, {"desc": "LA PINATA CHEDDAR CHEESE SAUCE 6x3kg", "norm": "", "qta": 12.0, "um": "PZ", "pm": 16.0, "tot": 192.0, "nd": 2, "note": ""}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "norm": "", "qta": 7.0, "um": "PZ", "pm": 20.99, "tot": 146.93, "nd": 2, "note": ""}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "norm": "", "qta": 40.0, "um": "PZ", "pm": 2.51, "tot": 100.4, "nd": 3, "note": ""}, {"desc": "CARTA BOBINA PRIME 168 (800STRAPPI) 2X1CNF", "norm": "", "qta": 10.0, "um": "PZ", "pm": 4.29, "tot": 42.9, "nd": 2, "note": "Nomi orig. diversi: CARTA BOBINA PRIME 168 (800STRAPPI) 2X1CNF / CARTA BOBINA PRIME 168 (800STRAPPI)55949 2X1CNF"}, {"desc": "HEINZ MAIONESE DIP POT 25G 100PZX1CT", "norm": "", "qta": 2.0, "um": "PZ", "pm": 20.99, "tot": 41.98, "nd": 1, "note": ""}, {"desc": "SAUCE CUP 2oz PP 20x50pz (60ml)", "norm": "", "qta": 20.0, "um": "PZ", "pm": 1.69, "tot": 33.8, "nd": 1, "note": ""}, {"desc": "NANG-FAH SRIRACHA CHILI SAUCE 12x450ml", "norm": "", "qta": 12.0, "um": "PZ", "pm": 2.79, "tot": 33.48, "nd": 1, "note": ""}, {"desc": "HEINZ MAIONESE PROFESSIONAL SECCHIELLO 5L", "norm": "", "qta": 2.0, "um": "PZ", "pm": 16.5, "tot": 33.0, "nd": 1, "note": ""}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "norm": "", "qta": 4.0, "um": "PZ", "pm": 7.2, "tot": 28.8, "nd": 1, "note": ""}, {"desc": "HEINZ KETCHUP DIP POT 25G 100PZX1CT", "norm": "", "qta": 2.0, "um": "PZ", "pm": 13.22, "tot": 26.44, "nd": 1, "note": ""}, {"desc": "HEINZ BARBECUE SAUCE 2X2.15L", "norm": "", "qta": 2.0, "um": "PZ", "pm": 9.5, "tot": 19.0, "nd": 1, "note": ""}], "total": 0}, {"header": "Settimana 3: 15\u201321 febbraio   |   4 ordini: 1260793, 1262140, 1263292, 1263890", "orders_info": "", "products": [{"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "norm": "", "qta": 252.0, "um": "KG", "pm": 8.3, "tot": 2091.6, "nd": 4, "note": ""}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "norm": "", "qta": 195.0, "um": "PZ", "pm": 8.0, "tot": 1560.0, "nd": 4, "note": ""}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "norm": "", "qta": 36.0, "um": "PZ", "pm": 9.3, "tot": 334.8, "nd": 4, "note": ""}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G (10pzx95g)", "norm": "CHICKEN BURGER CORNFLAKES 14X950G", "qta": 42.0, "um": "PZ", "pm": 7.1, "tot": 298.2, "nd": 3, "note": ""}, {"desc": "LA PINATA CHEDDAR CHEESE SAUCE 6x3kg", "norm": "", "qta": 18.0, "um": "PZ", "pm": 16.0, "tot": 288.0, "nd": 3, "note": ""}, {"desc": "HEINZ SMOKEY BACONNAISE SQ. 6X1LT", "norm": "", "qta": 36.0, "um": "PZ", "pm": 6.0, "tot": 216.0, "nd": 4, "note": ""}, {"desc": "CHICKEN NUGGETS CORNFLAKES 12X1KG (47pzX21g)", "norm": "CHICKEN NUGGETS CORNFLAKES 12X1KG", "qta": 24.0, "um": "PZ", "pm": 7.0, "tot": 168.0, "nd": 2, "note": ""}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "norm": "", "qta": 8.0, "um": "PZ", "pm": 20.99, "tot": 167.92, "nd": 3, "note": ""}, {"desc": "SCIROPPO D'ACERO PURO 12X250ML", "norm": "", "qta": 24.0, "um": "PZ", "pm": 5.25, "tot": 126.0, "nd": 2, "note": ""}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "norm": "", "qta": 16.0, "um": "PZ", "pm": 7.2, "tot": 115.2, "nd": 3, "note": ""}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "norm": "", "qta": 32.0, "um": "PZ", "pm": 2.51, "tot": 80.32, "nd": 2, "note": ""}, {"desc": "NANG-FAH SRIRACHA CHILI SAUCE 12x450ml", "norm": "", "qta": 24.0, "um": "PZ", "pm": 2.79, "tot": 66.96, "nd": 2, "note": ""}, {"desc": "FRUFRU LAMPONE CONGELATI RIC. CIOCCOLATO 16X140G", "norm": "", "qta": 16.0, "um": "PZ", "pm": 3.3, "tot": 52.8, "nd": 1, "note": ""}, {"desc": "FRUFRU FRAGOLA CONGELATI RIC. CIOCCOLATO 16X140G", "norm": "", "qta": 16.0, "um": "PZ", "pm": 3.3, "tot": 52.8, "nd": 1, "note": ""}, {"desc": "HEINZ MAIONESE PROFESSIONAL SECCHIELLO 5L", "norm": "", "qta": 3.0, "um": "PZ", "pm": 16.5, "tot": 49.5, "nd": 1, "note": ""}, {"desc": "HEINZ MAIONESE DIP POT 25G 100PZX1CT", "norm": "", "qta": 2.0, "um": "PZ", "pm": 20.99, "tot": 41.98, "nd": 1, "note": ""}, {"desc": "HEINZ BARBECUE SAUCE 2X2.15L", "norm": "", "qta": 4.0, "um": "PZ", "pm": 9.5, "tot": 38.0, "nd": 1, "note": ""}, {"desc": "CARTA BOBINA PRIME 168 (800STRAPPI)55949 2X1CNF", "norm": "CARTA BOBINA PRIME 168 (800STRAPPI) 2X1CNF", "qta": 8.0, "um": "PZ", "pm": 4.29, "tot": 34.32, "nd": 2, "note": ""}, {"desc": "HEINZ KETCHUP DIP POT 25G 100PZX1CT", "norm": "", "qta": 2.0, "um": "PZ", "pm": 13.22, "tot": 26.44, "nd": 1, "note": ""}], "total": 0}, {"header": "Settimana 4: 22\u201328 febbraio", "orders_info": "", "products": [{"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "norm": "", "qta": 666.0, "um": "KG", "pm": 8.3, "tot": 5527.8, "nd": 11, "note": "Settimane: S1, S2, S3"}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "norm": "", "qta": 515.0, "um": "PZ", "pm": 8.0, "tot": 4120.0, "nd": 11, "note": "Settimane: S1, S2, S3"}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G", "norm": "", "qta": 112.0, "um": "PZ", "pm": 7.1, "tot": 795.2, "nd": 8, "note": "Nomi: CHICKEN BURGER CORNFLAKES 14X950G / CHICKEN BURGER CORNFLAKES 14X950G (10pzx95g) | Settimane: S1, S2, S3"}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "norm": "", "qta": 84.0, "um": "PZ", "pm": 9.3, "tot": 781.2, "nd": 10, "note": "Settimane: S1, S2, S3"}, {"desc": "LA PINATA CHEDDAR CHEESE SAUCE 6x3kg", "norm": "", "qta": 42.0, "um": "PZ", "pm": 16.0, "tot": 672.0, "nd": 7, "note": "Settimane: S1, S2, S3"}, {"desc": "CHICKEN NUGGETS CORNFLAKES 12X1KG", "norm": "", "qta": 84.0, "um": "PZ", "pm": 7.0, "tot": 588.0, "nd": 7, "note": "Nomi: CHICKEN NUGGETS CORNFLAKES 12X1KG / CHICKEN NUGGETS CORNFLAKES 12X1KG (47pzX21g) | Settimane: S1, S2, S3"}, {"desc": "HEINZ SMOKEY BACONNAISE SQ. 6X1LT", "norm": "", "qta": 84.0, "um": "PZ", "pm": 6.0, "tot": 504.0, "nd": 8, "note": "Settimane: S1, S2, S3"}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "norm": "", "qta": 22.0, "um": "PZ", "pm": 20.99, "tot": 461.78, "nd": 8, "note": "Settimane: S1, S2, S3"}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "norm": "", "qta": 96.0, "um": "PZ", "pm": 2.51, "tot": 240.96, "nd": 7, "note": "Settimane: S1, S2, S3"}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "norm": "", "qta": 24.0, "um": "PZ", "pm": 7.2, "tot": 172.8, "nd": 5, "note": "Settimane: S1, S2, S3"}, {"desc": "SCIROPPO D'ACERO PURO 12X250ML", "norm": "", "qta": 24.0, "um": "PZ", "pm": 5.25, "tot": 126.0, "nd": 2, "note": "Settimane: S3"}, {"desc": "CARTA BOBINA PRIME 168 (800STRAPPI) 2X1CNF", "norm": "", "qta": 26.0, "um": "PZ", "pm": 4.29, "tot": 111.54, "nd": 6, "note": "Nomi: CARTA BOBINA PRIME 168 (800STRAPPI) 2X1CNF / CARTA BOBINA PRIME 168 (800STRAPPI)55949 2X1CNF | Settimane: S1, S2, S3"}, {"desc": "HEINZ MAIONESE DIP POT 25G 100PZX1CT", "norm": "", "qta": 5.0, "um": "PZ", "pm": 20.99, "tot": 104.95, "nd": 3, "note": "Settimane: S1, S2, S3"}, {"desc": "NANG-FAH SRIRACHA CHILI SAUCE 12x450ml", "norm": "", "qta": 36.0, "um": "PZ", "pm": 2.79, "tot": 100.44, "nd": 3, "note": "Settimane: S2, S3"}, {"desc": "HEINZ MAIONESE PROFESSIONAL SECCHIELLO 5L", "norm": "", "qta": 5.0, "um": "PZ", "pm": 16.5, "tot": 82.5, "nd": 2, "note": "Settimane: S2, S3"}, {"desc": "HEINZ BARBECUE SAUCE 2X2.15L", "norm": "", "qta": 8.0, "um": "PZ", "pm": 9.5, "tot": 76.0, "nd": 3, "note": "Settimane: S1, S2, S3"}, {"desc": "HEINZ KETCHUP DIP POT 25G 100PZX1CT", "norm": "", "qta": 4.0, "um": "PZ", "pm": 13.22, "tot": 52.88, "nd": 2, "note": "Settimane: S2, S3"}, {"desc": "FRUFRU LAMPONE CONGELATI RIC. CIOCCOLATO 16X140G", "norm": "", "qta": 16.0, "um": "PZ", "pm": 3.3, "tot": 52.8, "nd": 1, "note": "Settimane: S3"}, {"desc": "FRUFRU FRAGOLA CONGELATI RIC. CIOCCOLATO 16X140G", "norm": "", "qta": 16.0, "um": "PZ", "pm": 3.3, "tot": 52.8, "nd": 1, "note": "Settimane: S3"}, {"desc": "SAUCE CUP 2oz PP 20x50pz (60ml)", "norm": "", "qta": 20.0, "um": "PZ", "pm": 1.69, "tot": 33.8, "nd": 1, "note": "Settimane: S2"}], "total": 0}], "PONTE MILVIO": [{"header": "Settimana 1: 01\u201307 febbraio   |   3 ordini: 1255412, 1256536, 1256871", "orders_info": "", "products": [{"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "norm": "", "qta": 153.0, "um": "KG", "pm": 8.3, "tot": 1269.9, "nd": 2, "note": ""}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "norm": "", "qta": 85.0, "um": "PZ", "pm": 8.0, "tot": 680.0, "nd": 3, "note": ""}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G", "norm": "", "qta": 28.0, "um": "PZ", "pm": 7.1, "tot": 198.8, "nd": 2, "note": ""}, {"desc": "LA PINATA CHEDDAR CHEESE SAUCE 6x3kg", "norm": "", "qta": 12.0, "um": "PZ", "pm": 16.0, "tot": 192.0, "nd": 2, "note": ""}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "norm": "", "qta": 12.0, "um": "PZ", "pm": 9.3, "tot": 111.6, "nd": 2, "note": ""}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "norm": "", "qta": 5.0, "um": "PZ", "pm": 20.99, "tot": 104.95, "nd": 2, "note": ""}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "norm": "", "qta": 12.0, "um": "PZ", "pm": 7.2, "tot": 86.4, "nd": 2, "note": ""}, {"desc": "CHICKEN NUGGETS CORNFLAKES 12X1KG", "norm": "", "qta": 12.0, "um": "PZ", "pm": 7.0, "tot": 84.0, "nd": 1, "note": ""}, {"desc": "BURGERSLICES W/RED CHEDDAR 9X1,082KG/88PZ 60%", "norm": "", "qta": 9.0, "um": "PZ", "pm": 9.3, "tot": 83.7, "nd": 1, "note": ""}, {"desc": "HEINZ SMOKEY BACONNAISE SQ. 6X1LT", "norm": "", "qta": 12.0, "um": "PZ", "pm": 6.0, "tot": 72.0, "nd": 1, "note": ""}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "norm": "", "qta": 16.0, "um": "PZ", "pm": 2.51, "tot": 40.16, "nd": 2, "note": ""}, {"desc": "CARTA BOBINA PRIME 168 (800STRAPPI) 2X1CNF", "norm": "", "qta": 8.0, "um": "PZ", "pm": 4.395, "tot": 35.16, "nd": 2, "note": "\u26a0 prezzi diversi: \u20ac4.29 / \u20ac4.5"}, {"desc": "SAUCE CUP 2oz PP 20x50pz (60ml)", "norm": "", "qta": 20.0, "um": "PZ", "pm": 1.69, "tot": 33.8, "nd": 1, "note": ""}, {"desc": "HEINZ MAIONESE PROFESSIONAL SECCHIELLO 5L", "norm": "", "qta": 2.0, "um": "PZ", "pm": 16.15, "tot": 32.3, "nd": 1, "note": ""}, {"desc": "HEINZ MAIONESE DIP POT 25G 100PZX1CT", "norm": "", "qta": 1.0, "um": "PZ", "pm": 20.99, "tot": 20.99, "nd": 1, "note": ""}, {"desc": "HEINZ KETCHUP DIP POT 25G 100PZX1CT", "norm": "", "qta": 1.0, "um": "PZ", "pm": 13.22, "tot": 13.22, "nd": 1, "note": ""}], "total": 0}, {"header": "Settimana 2: 08\u201314 febbraio   |   4 ordini: 1257371, 1258763, 1259856, 1260386", "orders_info": "", "products": [{"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "norm": "", "qta": 207.0, "um": "KG", "pm": 8.3, "tot": 1718.1, "nd": 4, "note": ""}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "norm": "", "qta": 175.0, "um": "PZ", "pm": 8.0, "tot": 1400.0, "nd": 4, "note": ""}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G", "norm": "", "qta": 42.0, "um": "PZ", "pm": 7.1, "tot": 298.2, "nd": 3, "note": "Nomi orig. diversi: CHICKEN BURGER CORNFLAKES 14X950G / CHICKEN BURGER CORNFLAKES 14X950G (10pzx95g)"}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "norm": "", "qta": 30.0, "um": "PZ", "pm": 9.3, "tot": 279.0, "nd": 4, "note": ""}, {"desc": "LA PINATA CHEDDAR CHEESE SAUCE 6x3kg", "norm": "", "qta": 12.0, "um": "PZ", "pm": 16.0, "tot": 192.0, "nd": 2, "note": ""}, {"desc": "CHICKEN NUGGETS CORNFLAKES 12X1KG", "norm": "", "qta": 24.0, "um": "PZ", "pm": 7.0, "tot": 168.0, "nd": 2, "note": "Nomi orig. diversi: CHICKEN NUGGETS CORNFLAKES 12X1KG / CHICKEN NUGGETS CORNFLAKES 12X1KG (47pzX21g)"}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "norm": "", "qta": 8.0, "um": "PZ", "pm": 20.99, "tot": 167.92, "nd": 3, "note": ""}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "norm": "", "qta": 16.0, "um": "PZ", "pm": 7.2, "tot": 115.2, "nd": 3, "note": ""}, {"desc": "HEINZ SMOKEY BACONNAISE SQ. 6X1LT", "norm": "", "qta": 18.0, "um": "PZ", "pm": 6.0, "tot": 108.0, "nd": 2, "note": ""}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "norm": "", "qta": 40.0, "um": "PZ", "pm": 2.51, "tot": 100.4, "nd": 3, "note": ""}, {"desc": "HEINZ MAIONESE DIP POT 25G 100PZX1CT", "norm": "", "qta": 2.0, "um": "PZ", "pm": 20.99, "tot": 41.98, "nd": 1, "note": ""}, {"desc": "HEINZ BARBECUE SAUCE 2X2.15L", "norm": "", "qta": 4.0, "um": "PZ", "pm": 9.5, "tot": 38.0, "nd": 1, "note": ""}, {"desc": "CARTA BOBINA PRIME 168 (800STRAPPI)55949 2X1CNF", "norm": "CARTA BOBINA PRIME 168 (800STRAPPI) 2X1CNF", "qta": 8.0, "um": "PZ", "pm": 4.29, "tot": 34.32, "nd": 2, "note": ""}, {"desc": "SAUCE CUP 2oz PP 20x50pz (60ml)", "norm": "", "qta": 20.0, "um": "PZ", "pm": 1.69, "tot": 33.8, "nd": 1, "note": ""}, {"desc": "HEINZ KETCHUP DIP POT 25G 100PZX1CT", "norm": "", "qta": 2.0, "um": "PZ", "pm": 13.22, "tot": 26.44, "nd": 1, "note": ""}], "total": 0}, {"header": "Settimana 3: 15\u201321 febbraio   |   4 ordini: 1260795, 1262136, 1263313, 1263884", "orders_info": "", "products": [{"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "norm": "", "qta": 171.0, "um": "KG", "pm": 8.3, "tot": 1419.3, "nd": 4, "note": ""}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "norm": "", "qta": 120.0, "um": "PZ", "pm": 8.0, "tot": 960.0, "nd": 4, "note": ""}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "norm": "", "qta": 24.0, "um": "PZ", "pm": 9.3, "tot": 223.2, "nd": 4, "note": ""}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "norm": "", "qta": 10.0, "um": "PZ", "pm": 20.99, "tot": 209.9, "nd": 3, "note": ""}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G (10pzx95g)", "norm": "CHICKEN BURGER CORNFLAKES 14X950G", "qta": 28.0, "um": "PZ", "pm": 7.1, "tot": 198.8, "nd": 2, "note": ""}, {"desc": "LA PINATA CHEDDAR CHEESE SAUCE 6x3kg", "norm": "", "qta": 12.0, "um": "PZ", "pm": 16.0, "tot": 192.0, "nd": 2, "note": ""}, {"desc": "CHICKEN NUGGETS CORNFLAKES 12X1KG (47pzX21g)", "norm": "CHICKEN NUGGETS CORNFLAKES 12X1KG", "qta": 24.0, "um": "PZ", "pm": 7.0, "tot": 168.0, "nd": 2, "note": ""}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "norm": "", "qta": 20.0, "um": "PZ", "pm": 7.2, "tot": 144.0, "nd": 3, "note": ""}, {"desc": "HEINZ SMOKEY BACONNAISE SQ. 6X1LT", "norm": "", "qta": 18.0, "um": "PZ", "pm": 6.0, "tot": 108.0, "nd": 2, "note": ""}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "norm": "", "qta": 32.0, "um": "PZ", "pm": 2.51, "tot": 80.32, "nd": 2, "note": ""}, {"desc": "FRUFRU LAMPONE CONGELATI RIC. CIOCCOLATO 16X140G", "norm": "", "qta": 16.0, "um": "PZ", "pm": 3.3, "tot": 52.8, "nd": 1, "note": ""}, {"desc": "FRUFRU FRAGOLA CONGELATI RIC. CIOCCOLATO 16X140G", "norm": "", "qta": 16.0, "um": "PZ", "pm": 3.3, "tot": 52.8, "nd": 1, "note": ""}, {"desc": "HEINZ MAIONESE DIP POT 25G 100PZX1CT", "norm": "", "qta": 2.0, "um": "PZ", "pm": 20.99, "tot": 41.98, "nd": 1, "note": ""}, {"desc": "CARTA BOBINA PRIME 168 (800STRAPPI)55949 2X1CNF", "norm": "CARTA BOBINA PRIME 168 (800STRAPPI) 2X1CNF", "qta": 8.0, "um": "PZ", "pm": 4.29, "tot": 34.32, "nd": 2, "note": ""}, {"desc": "NANG-FAH SRIRACHA CHILI SAUCE 12x450ml", "norm": "", "qta": 12.0, "um": "PZ", "pm": 2.79, "tot": 33.48, "nd": 1, "note": ""}, {"desc": "HEINZ MAIONESE PROFESSIONAL SECCHIELLO 5L", "norm": "", "qta": 2.0, "um": "PZ", "pm": 16.5, "tot": 33.0, "nd": 1, "note": ""}, {"desc": "HEINZ KETCHUP DIP POT 25G 100PZX1CT", "norm": "", "qta": 1.0, "um": "PZ", "pm": 13.22, "tot": 13.22, "nd": 1, "note": ""}], "total": 0}, {"header": "Settimana 4: 22\u201328 febbraio   |   1 ordini: 1264317", "orders_info": "", "products": [{"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "norm": "", "qta": 50.0, "um": "PZ", "pm": 8.0, "tot": 400.0, "nd": 1, "note": ""}, {"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "norm": "", "qta": 45.0, "um": "KG", "pm": 8.3, "tot": 373.5, "nd": 1, "note": ""}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "norm": "", "qta": 12.0, "um": "PZ", "pm": 9.3, "tot": 111.6, "nd": 1, "note": ""}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G (10pzx95g)", "norm": "CHICKEN BURGER CORNFLAKES 14X950G", "qta": 14.0, "um": "PZ", "pm": 7.1, "tot": 99.4, "nd": 1, "note": ""}, {"desc": "CHICKEN NUGGETS CORNFLAKES 12X1KG (47pzX21g)", "norm": "CHICKEN NUGGETS CORNFLAKES 12X1KG", "qta": 12.0, "um": "PZ", "pm": 7.0, "tot": 84.0, "nd": 1, "note": ""}, {"desc": "HEINZ SMOKEY BACONNAISE SQ. 6X1LT", "norm": "", "qta": 12.0, "um": "PZ", "pm": 6.0, "tot": 72.0, "nd": 1, "note": ""}, {"desc": "SCIROPPO D'ACERO PURO 12X250ML", "norm": "", "qta": 12.0, "um": "PZ", "pm": 5.25, "tot": 63.0, "nd": 1, "note": ""}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "norm": "", "qta": 3.0, "um": "PZ", "pm": 20.99, "tot": 62.97, "nd": 1, "note": ""}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "norm": "", "qta": 8.0, "um": "PZ", "pm": 7.2, "tot": 57.6, "nd": 1, "note": ""}, {"desc": "NANG-FAH SRIRACHA CHILI SAUCE 12x450ml", "norm": "", "qta": 12.0, "um": "PZ", "pm": 2.79, "tot": 33.48, "nd": 1, "note": ""}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "norm": "", "qta": 8.0, "um": "PZ", "pm": 2.51, "tot": 20.08, "nd": 1, "note": ""}, {"desc": "CARTA BOBINA PRIME 168 (800STRAPPI)55949 2X1CNF", "norm": "CARTA BOBINA PRIME 168 (800STRAPPI) 2X1CNF", "qta": 4.0, "um": "PZ", "pm": 4.29, "tot": 17.16, "nd": 1, "note": ""}, {"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "norm": "", "qta": 576.0, "um": "KG", "pm": 8.3, "tot": 4780.8, "nd": 11, "note": "Settimane: S1, S2, S3, S4"}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "norm": "", "qta": 430.0, "um": "PZ", "pm": 8.0, "tot": 3440.0, "nd": 12, "note": "Settimane: S1, S2, S3, S4"}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G", "norm": "", "qta": 112.0, "um": "PZ", "pm": 7.1, "tot": 795.2, "nd": 8, "note": "Nomi: CHICKEN BURGER CORNFLAKES 14X950G / CHICKEN BURGER CORNFLAKES 14X950G (10pzx95g) | Settimane: S1, S2, S3, S4"}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "norm": "", "qta": 78.0, "um": "PZ", "pm": 9.3, "tot": 725.4, "nd": 11, "note": "Settimane: S1, S2, S3, S4"}, {"desc": "LA PINATA CHEDDAR CHEESE SAUCE 6x3kg", "norm": "", "qta": 36.0, "um": "PZ", "pm": 16.0, "tot": 576.0, "nd": 6, "note": "Settimane: S1, S2, S3"}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "norm": "", "qta": 26.0, "um": "PZ", "pm": 20.99, "tot": 545.74, "nd": 9, "note": "Settimane: S1, S2, S3, S4"}, {"desc": "CHICKEN NUGGETS CORNFLAKES 12X1KG", "norm": "", "qta": 72.0, "um": "PZ", "pm": 7.0, "tot": 504.0, "nd": 6, "note": "Nomi: CHICKEN NUGGETS CORNFLAKES 12X1KG / CHICKEN NUGGETS CORNFLAKES 12X1KG (47pzX21g) | Settimane: S1, S2, S3, S4"}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "norm": "", "qta": 56.0, "um": "PZ", "pm": 7.2, "tot": 403.2, "nd": 9, "note": "Settimane: S1, S2, S3, S4"}, {"desc": "HEINZ SMOKEY BACONNAISE SQ. 6X1LT", "norm": "", "qta": 60.0, "um": "PZ", "pm": 6.0, "tot": 360.0, "nd": 6, "note": "Settimane: S1, S2, S3, S4"}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "norm": "", "qta": 96.0, "um": "PZ", "pm": 2.51, "tot": 240.96, "nd": 8, "note": "Settimane: S1, S2, S3, S4"}, {"desc": "CARTA BOBINA PRIME 168 (800STRAPPI) 2X1CNF", "norm": "", "qta": 28.0, "um": "PZ", "pm": 4.32, "tot": 120.96, "nd": 7, "note": "Nomi: CARTA BOBINA PRIME 168 (800STRAPPI) 2X1CNF / CARTA BOBINA PRIME 168 (800STRAPPI)55949 2X1CNF | \u26a0 prezzi: \u20ac4.29 / \u20ac4.5 | Settimane: S1, S2, S3, S4"}, {"desc": "HEINZ MAIONESE DIP POT 25G 100PZX1CT", "norm": "", "qta": 5.0, "um": "PZ", "pm": 20.99, "tot": 104.95, "nd": 3, "note": "Settimane: S1, S2, S3"}, {"desc": "BURGERSLICES W/RED CHEDDAR 9X1,082KG/88PZ 60%", "norm": "", "qta": 9.0, "um": "PZ", "pm": 9.3, "tot": 83.7, "nd": 1, "note": "Settimane: S1"}, {"desc": "SAUCE CUP 2oz PP 20x50pz (60ml)", "norm": "", "qta": 40.0, "um": "PZ", "pm": 1.69, "tot": 67.6, "nd": 2, "note": "Settimane: S1, S2"}, {"desc": "NANG-FAH SRIRACHA CHILI SAUCE 12x450ml", "norm": "", "qta": 24.0, "um": "PZ", "pm": 2.79, "tot": 66.96, "nd": 2, "note": "Settimane: S3, S4"}, {"desc": "HEINZ MAIONESE PROFESSIONAL SECCHIELLO 5L", "norm": "", "qta": 4.0, "um": "PZ", "pm": 16.325, "tot": 65.3, "nd": 2, "note": "\u26a0 prezzi: \u20ac16.15 / \u20ac16.5 | Settimane: S1, S3"}, {"desc": "SCIROPPO D'ACERO PURO 12X250ML", "norm": "", "qta": 12.0, "um": "PZ", "pm": 5.25, "tot": 63.0, "nd": 1, "note": "Settimane: S4"}, {"desc": "HEINZ KETCHUP DIP POT 25G 100PZX1CT", "norm": "", "qta": 4.0, "um": "PZ", "pm": 13.22, "tot": 52.88, "nd": 3, "note": "Settimane: S1, S2, S3"}, {"desc": "FRUFRU LAMPONE CONGELATI RIC. CIOCCOLATO 16X140G", "norm": "", "qta": 16.0, "um": "PZ", "pm": 3.3, "tot": 52.8, "nd": 1, "note": "Settimane: S3"}, {"desc": "FRUFRU FRAGOLA CONGELATI RIC. CIOCCOLATO 16X140G", "norm": "", "qta": 16.0, "um": "PZ", "pm": 3.3, "tot": 52.8, "nd": 1, "note": "Settimane: S3"}, {"desc": "HEINZ BARBECUE SAUCE 2X2.15L", "norm": "", "qta": 4.0, "um": "PZ", "pm": 9.5, "tot": 38.0, "nd": 1, "note": "Settimane: S2"}], "total": 0}], "TUSCOLANA": [{"header": "Settimana 1: 01\u201307 febbraio   |   3 ordini: 1255415, 1256534, 1256875", "orders_info": "", "products": [{"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "norm": "", "qta": 180.0, "um": "KG", "pm": 8.3, "tot": 1494.0, "nd": 3, "note": ""}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "norm": "", "qta": 90.0, "um": "PZ", "pm": 8.0, "tot": 720.0, "nd": 3, "note": ""}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G", "norm": "", "qta": 42.0, "um": "PZ", "pm": 7.1, "tot": 298.2, "nd": 3, "note": ""}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "norm": "", "qta": 24.0, "um": "PZ", "pm": 9.3, "tot": 223.2, "nd": 2, "note": ""}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "norm": "", "qta": 5.0, "um": "PZ", "pm": 20.99, "tot": 104.95, "nd": 2, "note": ""}, {"desc": "LA PINATA CHEDDAR CHEESE SAUCE 6x3kg", "norm": "", "qta": 6.0, "um": "PZ", "pm": 16.0, "tot": 96.0, "nd": 1, "note": ""}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "norm": "", "qta": 12.0, "um": "PZ", "pm": 7.2, "tot": 86.4, "nd": 2, "note": ""}, {"desc": "CHICKEN NUGGETS CORNFLAKES 12X1KG", "norm": "", "qta": 12.0, "um": "PZ", "pm": 7.0, "tot": 84.0, "nd": 1, "note": ""}, {"desc": "HEINZ SMOKEY BACONNAISE SQ. 6X1LT", "norm": "", "qta": 12.0, "um": "PZ", "pm": 6.0, "tot": 72.0, "nd": 1, "note": ""}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "norm": "", "qta": 24.0, "um": "PZ", "pm": 2.51, "tot": 60.24, "nd": 2, "note": ""}, {"desc": "CARTA BOBINA PRIME 168 (800STRAPPI) 2X1CNF", "norm": "", "qta": 8.0, "um": "PZ", "pm": 4.395, "tot": 35.16, "nd": 2, "note": "\u26a0 prezzi diversi: \u20ac4.29 / \u20ac4.5"}, {"desc": "SAUCE CUP 2oz PP 20x50pz (60ml)", "norm": "", "qta": 20.0, "um": "PZ", "pm": 1.69, "tot": 33.8, "nd": 1, "note": ""}, {"desc": "HEINZ BARBECUE SAUCE 2X2.15L", "norm": "", "qta": 2.0, "um": "PZ", "pm": 9.5, "tot": 19.0, "nd": 1, "note": ""}], "total": 0}, {"header": "Settimana 2: 08\u201314 febbraio   |   4 ordini: 1257374, 1258764, 1259850, 1260382", "orders_info": "", "products": [{"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "norm": "", "qta": 180.0, "um": "KG", "pm": 8.3, "tot": 1494.0, "nd": 4, "note": ""}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "norm": "", "qta": 160.0, "um": "PZ", "pm": 8.0, "tot": 1280.0, "nd": 4, "note": ""}, {"desc": "LA PINATA CHEDDAR CHEESE SAUCE 6x3kg", "norm": "", "qta": 18.0, "um": "PZ", "pm": 16.0, "tot": 288.0, "nd": 3, "note": ""}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G", "norm": "", "qta": 28.0, "um": "PZ", "pm": 7.1, "tot": 198.8, "nd": 2, "note": "Nomi orig. diversi: CHICKEN BURGER CORNFLAKES 14X950G / CHICKEN BURGER CORNFLAKES 14X950G (10pzx95g)"}, {"desc": "CHICKEN NUGGETS CORNFLAKES 12X1KG", "norm": "", "qta": 24.0, "um": "PZ", "pm": 7.0, "tot": 168.0, "nd": 2, "note": "Nomi orig. diversi: CHICKEN NUGGETS CORNFLAKES 12X1KG / CHICKEN NUGGETS CORNFLAKES 12X1KG (47pzX21g)"}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "norm": "", "qta": 18.0, "um": "PZ", "pm": 9.3, "tot": 167.4, "nd": 3, "note": ""}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "norm": "", "qta": 16.0, "um": "PZ", "pm": 7.2, "tot": 115.2, "nd": 3, "note": ""}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "norm": "", "qta": 5.0, "um": "PZ", "pm": 20.99, "tot": 104.95, "nd": 2, "note": ""}, {"desc": "HEINZ SMOKEY BACONNAISE SQ. 6X1LT", "norm": "", "qta": 12.0, "um": "PZ", "pm": 6.0, "tot": 72.0, "nd": 2, "note": ""}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "norm": "", "qta": 24.0, "um": "PZ", "pm": 2.51, "tot": 60.24, "nd": 3, "note": ""}, {"desc": "HEINZ MAIONESE DIP POT 25G 100PZX1CT", "norm": "", "qta": 2.0, "um": "PZ", "pm": 20.99, "tot": 41.98, "nd": 1, "note": ""}, {"desc": "SAUCE CUP 2oz PP 20x50pz (60ml)", "norm": "", "qta": 20.0, "um": "PZ", "pm": 1.69, "tot": 33.8, "nd": 1, "note": ""}, {"desc": "HEINZ MAIONESE PROFESSIONAL SECCHIELLO 5L", "norm": "", "qta": 2.0, "um": "PZ", "pm": 16.5, "tot": 33.0, "nd": 1, "note": ""}, {"desc": "CARTA BOBINA PRIME 168 (800STRAPPI) 2X1CNF", "norm": "", "qta": 6.0, "um": "PZ", "pm": 4.29, "tot": 25.74, "nd": 2, "note": "Nomi orig. diversi: CARTA BOBINA PRIME 168 (800STRAPPI) 2X1CNF / CARTA BOBINA PRIME 168 (800STRAPPI)55949 2X1CNF"}], "total": 0}, {"header": "Settimana 3: 15\u201321 febbraio   |   4 ordini: 1260794, 1262130, 1263299, 1263880", "orders_info": "", "products": [{"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "norm": "", "qta": 126.0, "um": "KG", "pm": 8.3, "tot": 1045.8, "nd": 3, "note": ""}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "norm": "", "qta": 100.0, "um": "PZ", "pm": 8.0, "tot": 800.0, "nd": 4, "note": ""}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G (10pzx95g)", "norm": "CHICKEN BURGER CORNFLAKES 14X950G", "qta": 42.0, "um": "PZ", "pm": 7.1, "tot": 298.2, "nd": 3, "note": ""}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "norm": "", "qta": 24.0, "um": "PZ", "pm": 9.3, "tot": 223.2, "nd": 3, "note": ""}, {"desc": "LA PINATA CHEDDAR CHEESE SAUCE 6x3kg", "norm": "", "qta": 12.0, "um": "PZ", "pm": 16.0, "tot": 192.0, "nd": 2, "note": ""}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "norm": "", "qta": 7.0, "um": "PZ", "pm": 20.99, "tot": 146.93, "nd": 3, "note": ""}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "norm": "", "qta": 48.0, "um": "PZ", "pm": 2.51, "tot": 120.48, "nd": 3, "note": ""}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "norm": "", "qta": 16.0, "um": "PZ", "pm": 7.2, "tot": 115.2, "nd": 3, "note": ""}, {"desc": "CHICKEN NUGGETS CORNFLAKES 12X1KG (47pzX21g)", "norm": "CHICKEN NUGGETS CORNFLAKES 12X1KG", "qta": 12.0, "um": "PZ", "pm": 7.0, "tot": 84.0, "nd": 1, "note": ""}, {"desc": "HEINZ SMOKEY BACONNAISE SQ. 6X1LT", "norm": "", "qta": 12.0, "um": "PZ", "pm": 6.0, "tot": 72.0, "nd": 1, "note": ""}, {"desc": "FRUFRU LAMPONE CONGELATI RIC. CIOCCOLATO 16X140G", "norm": "", "qta": 16.0, "um": "PZ", "pm": 3.3, "tot": 52.8, "nd": 1, "note": ""}, {"desc": "FRUFRU FRAGOLA CONGELATI RIC. CIOCCOLATO 16X140G", "norm": "", "qta": 16.0, "um": "PZ", "pm": 3.3, "tot": 52.8, "nd": 1, "note": ""}, {"desc": "CARTA BOBINA PRIME 168 (800STRAPPI)55949 2X1CNF", "norm": "CARTA BOBINA PRIME 168 (800STRAPPI) 2X1CNF", "qta": 12.0, "um": "PZ", "pm": 4.29, "tot": 51.48, "nd": 3, "note": ""}, {"desc": "HEINZ MAIONESE DIP POT 25G 100PZX1CT", "norm": "", "qta": 2.0, "um": "PZ", "pm": 20.99, "tot": 41.98, "nd": 1, "note": ""}, {"desc": "HEINZ BARBECUE SAUCE 2X2.15L", "norm": "", "qta": 4.0, "um": "PZ", "pm": 9.5, "tot": 38.0, "nd": 2, "note": ""}, {"desc": "NANG-FAH SRIRACHA CHILI SAUCE 12x450ml", "norm": "", "qta": 12.0, "um": "PZ", "pm": 2.79, "tot": 33.48, "nd": 1, "note": ""}, {"desc": "HEINZ MAIONESE PROFESSIONAL SECCHIELLO 5L", "norm": "", "qta": 2.0, "um": "PZ", "pm": 16.5, "tot": 33.0, "nd": 1, "note": ""}], "total": 0}, {"header": "Settimana 4: 22\u201328 febbraio", "orders_info": "", "products": [{"desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "norm": "", "qta": 486.0, "um": "KG", "pm": 8.3, "tot": 4033.8, "nd": 10, "note": "Settimane: S1, S2, S3"}, {"desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "norm": "", "qta": 350.0, "um": "PZ", "pm": 8.0, "tot": 2800.0, "nd": 11, "note": "Settimane: S1, S2, S3"}, {"desc": "CHICKEN BURGER CORNFLAKES 14X950G", "norm": "", "qta": 112.0, "um": "PZ", "pm": 7.1, "tot": 795.2, "nd": 8, "note": "Nomi: CHICKEN BURGER CORNFLAKES 14X950G / CHICKEN BURGER CORNFLAKES 14X950G (10pzx95g) | Settimane: S1, S2, S3"}, {"desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "norm": "", "qta": 66.0, "um": "PZ", "pm": 9.3, "tot": 613.8, "nd": 8, "note": "Settimane: S1, S2, S3"}, {"desc": "LA PINATA CHEDDAR CHEESE SAUCE 6x3kg", "norm": "", "qta": 36.0, "um": "PZ", "pm": 16.0, "tot": 576.0, "nd": 6, "note": "Settimane: S1, S2, S3"}, {"desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "norm": "", "qta": 17.0, "um": "PZ", "pm": 20.99, "tot": 356.83, "nd": 7, "note": "Settimane: S1, S2, S3"}, {"desc": "CHICKEN NUGGETS CORNFLAKES 12X1KG", "norm": "", "qta": 48.0, "um": "PZ", "pm": 7.0, "tot": 336.0, "nd": 4, "note": "Nomi: CHICKEN NUGGETS CORNFLAKES 12X1KG / CHICKEN NUGGETS CORNFLAKES 12X1KG (47pzX21g) | Settimane: S1, S2, S3"}, {"desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "norm": "", "qta": 44.0, "um": "PZ", "pm": 7.2, "tot": 316.8, "nd": 8, "note": "Settimane: S1, S2, S3"}, {"desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "norm": "", "qta": 96.0, "um": "PZ", "pm": 2.51, "tot": 240.96, "nd": 8, "note": "Settimane: S1, S2, S3"}, {"desc": "HEINZ SMOKEY BACONNAISE SQ. 6X1LT", "norm": "", "qta": 36.0, "um": "PZ", "pm": 6.0, "tot": 216.0, "nd": 4, "note": "Settimane: S1, S2, S3"}, {"desc": "CARTA BOBINA PRIME 168 (800STRAPPI) 2X1CNF", "norm": "", "qta": 26.0, "um": "PZ", "pm": 4.32, "tot": 112.38, "nd": 7, "note": "Nomi: CARTA BOBINA PRIME 168 (800STRAPPI) 2X1CNF / CARTA BOBINA PRIME 168 (800STRAPPI)55949 2X1CNF | \u26a0 prezzi: \u20ac4.29 / \u20ac4.5 | Settimane: S1, S2, S3"}, {"desc": "HEINZ MAIONESE DIP POT 25G 100PZX1CT", "norm": "", "qta": 4.0, "um": "PZ", "pm": 20.99, "tot": 83.96, "nd": 2, "note": "Settimane: S2, S3"}, {"desc": "SAUCE CUP 2oz PP 20x50pz (60ml)", "norm": "", "qta": 40.0, "um": "PZ", "pm": 1.69, "tot": 67.6, "nd": 2, "note": "Settimane: S1, S2"}, {"desc": "HEINZ MAIONESE PROFESSIONAL SECCHIELLO 5L", "norm": "", "qta": 4.0, "um": "PZ", "pm": 16.5, "tot": 66.0, "nd": 2, "note": "Settimane: S2, S3"}, {"desc": "HEINZ BARBECUE SAUCE 2X2.15L", "norm": "", "qta": 6.0, "um": "PZ", "pm": 9.5, "tot": 57.0, "nd": 3, "note": "Settimane: S1, S3"}, {"desc": "FRUFRU LAMPONE CONGELATI RIC. CIOCCOLATO 16X140G", "norm": "", "qta": 16.0, "um": "PZ", "pm": 3.3, "tot": 52.8, "nd": 1, "note": "Settimane: S3"}, {"desc": "FRUFRU FRAGOLA CONGELATI RIC. CIOCCOLATO 16X140G", "norm": "", "qta": 16.0, "um": "PZ", "pm": 3.3, "tot": 52.8, "nd": 1, "note": "Settimane: S3"}, {"desc": "NANG-FAH SRIRACHA CHILI SAUCE 12x450ml", "norm": "", "qta": 12.0, "um": "PZ", "pm": 2.79, "tot": 33.48, "nd": 1, "note": "Settimane: S3"}], "total": 0}]},
+  anomalies: [{"n": 1, "cat": "PREZZO", "tipo": "Prezzi diversi per stesso prodotto", "cert": "\ud83d\udd34 CERTA", "store": "Multi-store", "ordine": "\u2014", "det": "HEINZ MAIONESE PROFESSIONAL SECCHIELLO 5L\n\u20ac16.15 \u2192 PONTE MILVIO, TRASTEVERE | \u20ac16.5 \u2192 PIAZZA ISTRIA, PONTE MILVIO, TRASTEVERE, TUSCOLANA"}, {"n": 2, "cat": "PREZZO", "tipo": "Prezzi diversi per stesso prodotto", "cert": "\ud83d\udd34 CERTA", "store": "Multi-store", "ordine": "\u2014", "det": "HEINZ KETCHUP PAIL 5.7kg\n\u20ac14.37 \u2192 TRASTEVERE | \u20ac14.99 \u2192 TRASTEVERE"}, {"n": 3, "cat": "PREZZO", "tipo": "Prezzi diversi per stesso prodotto", "cert": "\ud83d\udd34 CERTA", "store": "Multi-store", "ordine": "\u2014", "det": "HEINZ SMOKEY BACONNAISE SQ. 6X1LT\n\u20ac6 \u2192 PIAZZA ISTRIA, PONTE MILVIO, TRASTEVERE, TUSCOLANA | \u20ac6.39 \u2192 TRASTEVERE"}, {"n": 4, "cat": "PREZZO", "tipo": "Prezzi diversi per stesso prodotto", "cert": "\ud83d\udd34 CERTA", "store": "Multi-store", "ordine": "\u2014", "det": "HEINZ BARBECUE SAUCE 2X2.15L\n\u20ac8.9 \u2192 TRASTEVERE | \u20ac9.5 \u2192 PIAZZA ISTRIA, PONTE MILVIO, TRASTEVERE, TUSCOLANA"}, {"n": 5, "cat": "PREZZO", "tipo": "Prezzi diversi per stesso prodotto", "cert": "\ud83d\udd34 CERTA", "store": "Multi-store", "ordine": "\u2014", "det": "CARTA BOBINA PRIME 168 (800STRAPPI) 2X1CNF\n\u20ac4.29 \u2192 PIAZZA ISTRIA, PONTE MILVIO, TRASTEVERE, TUSCOLANA | \u20ac4.5 \u2192 PONTE MILVIO, TRASTEVERE, TUSCOLANA"}, {"n": 6, "cat": "PREZZO", "tipo": "Prezzo superiore al prevalente: probabile aggiornamento listino", "cert": "\ud83d\udfe1 DA VERIFICARE", "store": "TRASTEVERE, PONTE MILVIO, TUSCOLANA", "ordine": "1254017, 1255412, 1255415 (01\u201303/02)", "det": "CARTA BOBINA PRIME 168 (800STRAPPI) 2X1CNF\nPrezzo \u20ac4.50 nei primissimi ordini di febbraio. Poi \u20ac4.29 in tutti gli ordini successivi su tutti i fogli. Possibile cambio listino a inizio mese."}, {"n": 7, "cat": "PREZZO", "tipo": "Prezzo inferiore al prevalente: possibile prezzo errato", "cert": "\ud83d\udfe1 DA VERIFICARE", "store": "TRASTEVERE", "ordine": "1254017 (01/02)", "det": "HEINZ BARBECUE SAUCE 2X2.15L\nPrezzo \u20ac8.90 in ordine 1254017 (TRASTEVERE). Prezzo \u20ac9.50 in tutti gli altri 10 ordini su tutti i fogli. Scarto: \u20ac0.60. Probabile prezzo errato nel primo ordine."}, {"n": 8, "cat": "PREZZO", "tipo": "Prezzo superiore al prevalente: possibile prezzo errato", "cert": "\ud83d\udfe1 DA VERIFICARE", "store": "TRASTEVERE", "ordine": "1254017 (01/02)", "det": "HEINZ SMOKEY BACONNAISE SQ. 6X1LT\nPrezzo \u20ac6.39 in ordine 1254017 (TRASTEVERE). Prezzo \u20ac6.00 in tutti gli altri 24 ordini su tutti i fogli. Scarto: \u20ac0.39. Probabile vecchio listino."}, {"n": 9, "cat": "PREZZO", "tipo": "Prezzi diversi: possibile aggiornamento listino", "cert": "\ud83d\udfe1 DA VERIFICARE", "store": "TRASTEVERE", "ordine": "1254017, 1256869 \u2192 \u20ac14.37; 1259852 \u2192 \u20ac14.99", "det": "HEINZ KETCHUP PAIL 5.7kg\nTre ordini TRASTEVERE: \u20ac14.37 (01/02, 06/02) e \u20ac14.99 (12/02). Aumento di \u20ac0.62. Verificare se cambio listino o errore."}, {"n": 10, "cat": "PREZZO", "tipo": "Prezzi diversi: possibile aggiornamento listino", "cert": "\ud83d\udfe1 DA VERIFICARE", "store": "TRASTEVERE, PONTE MILVIO", "ordine": "\u20ac16.15: ord. 1254017, 1256869, 1256871 | \u20ac16.50: tutti gli ordini successivi", "det": "HEINZ MAIONESE PROFESSIONAL SECCHIELLO 5L\nPrezzo \u20ac16.15 nei primissimi ordini (inizio febbraio). Poi \u20ac16.50 in tutti gli ordini successivi. Scarto: \u20ac0.35. Pattern coerente con cambio listino."}, {"n": 11, "cat": "QUANTIT\u00c0", "tipo": "Quantit\u00e0 anomala (outlier rispetto alla media)", "cert": "\ud83d\udfe1 DA VERIFICARE", "store": "TRASTEVERE", "ordine": "1254017", "det": "HEINZ MAIONESE PROFESSIONAL SECCHIELLO 5L\nQt\u00e0=10 | Media storica=3.8 | Qt\u00e0 10 vs media ~3.8 per gli altri ordini. Possibile ordine iniziale o errore di digitazione."}, {"n": 12, "cat": "QUANTIT\u00c0", "tipo": "Quantit\u00e0 anomala (outlier rispetto alla media)", "cert": "\ud83d\udfe1 DA VERIFICARE", "store": "TRASTEVERE", "ordine": "1263297", "det": "LA PINATA CHEDDAR CHEESE SAUCE 6x3kg\nQt\u00e0=12 | Media storica=6.2 | Qt\u00e0 12 vs media ~6.1 su tutti gli ordini. Doppia rispetto alla norma. DA VERIFICARE."}, {"n": 13, "cat": "QUANTIT\u00c0", "tipo": "Quantit\u00e0 anomala (outlier rispetto alla media)", "cert": "\ud83d\udfe1 DA VERIFICARE", "store": "PIAZZA ISTRIA", "ordine": "1258755", "det": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L\nQt\u00e0=5 | Media storica=2.6 | Qt\u00e0 5 vs media ~2.6 su tutti i fogli. Quasi il doppio della quantit\u00e0 abituale."}, {"n": 14, "cat": "QUANTIT\u00c0", "tipo": "Quantit\u00e0 anomala (outlier rispetto alla media)", "cert": "\ud83d\udfe1 DA VERIFICARE", "store": "PIAZZA ISTRIA", "ordine": "1259845", "det": "CARTA BOBINA PRIME 168 (800STRAPPI)55949 2X1CNF\nQt\u00e0=8 | Media storica=3.9 | Qt\u00e0 8 vs media ~3.9. Doppia rispetto agli altri ordini dello stesso prodotto."}, {"n": 15, "cat": "NOME PRODOTTO", "tipo": "Nomi incoerenti / possibili prodotti duplicati", "cert": "\ud83d\udfe1 DA VERIFICARE", "store": "Tutti i fogli", "ordine": "Ordini B1 vs B2/B3", "det": "\"CHICKEN BURGER CORNFLAKES 14X950G\" / \"CHICKEN BURGER CORNFLAKES 14X950G (10pzx95g)\"\nStesso prodotto con nome breve (senza specifiche porzione) in ordini B1, e nome esteso in ordini B2/B3. Normalizzare il nome per coerenza."}, {"n": 16, "cat": "NOME PRODOTTO", "tipo": "Nomi incoerenti / possibili prodotti duplicati", "cert": "\ud83d\udfe1 DA VERIFICARE", "store": "Tutti i fogli", "ordine": "Ordini B1 vs B2/B3", "det": "\"CHICKEN NUGGETS CORNFLAKES 12X1KG\" / \"CHICKEN NUGGETS CORNFLAKES 12X1KG (47pzX21g)\"\nStesso prodotto con nome breve in ordini B1 e nome con specifiche in B2/B3. Stessa situazione del Chicken Burger."}, {"n": 17, "cat": "NOME PRODOTTO", "tipo": "Nomi incoerenti / possibili prodotti duplicati", "cert": "\ud83d\udfe1 DA VERIFICARE", "store": "Tutti i fogli", "ordine": "Da ord. 1258763 in poi", "det": "\"CARTA BOBINA PRIME 168 (800STRAPPI) 2X1CNF\" / \"CARTA BOBINA PRIME 168 (800STRAPPI)55949 2X1CNF\"\nLo stesso articolo appare con e senza il codice interno '55949'. Dalla data di comparsa (12/02), il codice viene aggiunto sistematicamente. Stesso prezzo (\u20ac4.29)."}, {"n": 18, "cat": "NOME PRODOTTO", "tipo": "Nomi incoerenti / possibili prodotti duplicati", "cert": "\ud83d\udfe1 DA VERIFICARE", "store": "TRASTEVERE, PONTE MILVIO", "ordine": "Vari ordini", "det": "\"BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ\" / \"BURGERSLICES W/RED CHEDDAR 9X1,082KG/88PZ 60%\"\nDue formati diversi: 6 confezioni da 1.080kg vs 9 confezioni da 1.082kg. Stesso prezzo \u20ac9.30. Potrebbero essere due SKU distinti o un errore di descrizione. Presente solo in TRASTEVERE e PONTE MILVIO."}, {"n": 19, "cat": "DATI MANCANTI", "tipo": "Data consegna mancante", "cert": "\ud83d\udd34 CERTA", "store": "PIAZZA ISTRIA", "ordine": "1256928", "det": "(ordine intero)\nData consegna = 'N/D'. Ordine del 06/02/2026, operatore Francesca D'Achille. Impossibile verificare rispetto dei tempi di consegna."}],
+  verifications: ["\u2705 VERIFICHE CON ESITO POSITIVO (nessuna anomalia rilevata)", "\u2022 Totali ordine (Totale Doc \u20ac) correttamente calcolati come somma degli importi con IVA \u2014 tutti i 47 ordini verificati.", "\u2022 Importi riga (Importo \u20ac) = Qt\u00e0 \u00d7 Prezzo Netto \u2014 nessuna discrepanza oltre tolleranza 0.05\u20ac su tutte le 434 righe.", "\u2022 Nessun prezzo zero o mancante rilevato.", "\u2022 Nessuna quantit\u00e0 zero, negativa o mancante rilevata.", "\u2022 Nessun numero d'ordine duplicato tra i fogli.", "\u2022 IVA applicata coerentemente: 4% (olio, burgerslices), 10% (prodotti alimentari), 22% (carta bobina, sauce cup) \u2014 pattern costante."],
+  note_credito: ["NOTE DI CREDITO \u2014 TISMASHO SRL \u2014 FEBBRAIO 2026 \u2014 Uniontrade Spa", "Verifica effettuata su tutti i documenti sorgente (Blocco 1, Blocco 2 P1, Blocco 2 P2, Blocco 3, Ordine 1264317)", "\u2705  ESITO VERIFICA: Nessuna nota di credito presente nei documenti analizzati", "DETTAGLIO VERIFICA PER BLOCCO", "Blocco 1 (01\u201310/02/2026) | \u2022 Nessuna nota di credito rilevata tra i documenti analizzati.  (fonte: RIEPILOGO GENERALE, riga 14)", "Blocco 2 \u2013 Parte 1 (10\u201313/02/2026) | \u2022 Nessuna nota di credito presente.  (fonte: RIEPILOGO GENERALE, riga 18)", "Blocco 2 \u2013 Parte 2 (15\u201319/02/2026) | \u2022 Nessuna nota di credito presente.  (fonte: RIEPILOGO GENERALE, riga 18)", "Blocco 3 (19\u201322/02/2026) | \u2022 Nessuna nota di credito presente.  (fonte: RIEPILOGO GENERALE, riga 18)", "Ordine 1264317 (22/02/2026) | \u2022 Documento separato \u2014 nessuna nota di credito associata.", "Valori negativi | \u2022 Nessun valore negativo rilevato in nessun foglio (434 righe prodotto verificate).", "SEZIONE: FATTURE / NOTE DI CREDITO DA VERIFICARE", "Nessun documento da segnalare in questa sezione. Tutti gli ordini sono stati correttamente identificati e assegnati ai rispettivi store."],
+  riepilogo: [{"store": "TRASTEVERE", "n_ordini": 13, "imp": 16218.96, "iva": 1565.24, "tot": 17784.2}, {"store": "PIAZZA ISTRIA", "n_ordini": 11, "imp": 14657.45, "iva": 1408.61, "tot": 16066.06}, {"store": "PONTE MILVIO", "n_ordini": 12, "imp": 13140.25, "iva": 1255.39, "tot": 14395.64}, {"store": "TUSCOLANA", "n_ordini": 11, "imp": 10811.41, "iva": 1044.52, "tot": 11855.93}, {"store": "\u2b1b  TOTALE COMPLESSIVO FEBBRAIO 2026", "n_ordini": 47, "imp": 54828.07, "iva": 5273.76, "tot": 60101.83}],
+  listino_concordato: [{"cod": "HAM001", "desc": "SMASH BURGER B.A 90GR GELO 1X9KG", "um": "KG", "price": 8.3, "iva": 10}, {"cod": "USMA01A", "desc": "MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g", "um": "PZ", "price": 8.0, "iva": 10}, {"cod": "ICHED3", "desc": "BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ", "um": "PZ", "price": 9.3, "iva": 4}, {"cod": "ICHED4", "desc": "BURGERSLICES W/RED CHEDDAR 9X1,082KG/88PZ 60%", "um": "PZ", "price": 9.3, "iva": 4}, {"cod": "FFW016", "desc": "CHICKEN BURGER CORNFLAKES 14X950G", "um": "PZ", "price": 7.1, "iva": 10}, {"cod": "FFW018", "desc": "CHICKEN NUGGETS CORNFLAKES 12X1KG", "um": "PZ", "price": 7.0, "iva": 10}, {"cod": "HAM010", "desc": "KOKA CRISPY CHICKEN POPS 4X1KG", "um": "PZ", "price": 7.2, "iva": 10}, {"cod": "IPINATA", "desc": "LA PINATA CHEDDAR CHEESE SAUCE 6x3kg", "um": "PZ", "price": 16.0, "iva": 10}, {"cod": "HEIN35", "desc": "HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml", "um": "PZ", "price": 2.51, "iva": 10}, {"cod": "HEIN37", "desc": "HEINZ SMOKEY BACONNAISE SQ. 6X1LT", "um": "PZ", "price": 6.0, "iva": 10}, {"cod": "HEIN38", "desc": "HEINZ BARBECUE SAUCE 2X2.15L", "um": "PZ", "price": 9.5, "iva": 10}, {"cod": "HEIN40", "desc": "HEINZ MAIONESE PROFESSIONAL SECCHIELLO 5L", "um": "PZ", "price": 16.5, "iva": 10}, {"cod": "HEIN41", "desc": "HEINZ MAIONESE DIP POT 25G 100PZX1CT", "um": "PZ", "price": 20.99, "iva": 10}, {"cod": "HEIN42", "desc": "HEINZ KETCHUP DIP POT 25G 100PZX1CT", "um": "PZ", "price": 13.22, "iva": 10}, {"cod": "HEIN43", "desc": "HEINZ KETCHUP PAIL 5.7kg", "um": "PZ", "price": 14.99, "iva": 10}, {"cod": "IOLI38", "desc": "OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L", "um": "PZ", "price": 20.99, "iva": 4}, {"cod": "ICAR01", "desc": "CARTA BOBINA PRIME 168 (800STRAPPI) 2X1CNF", "um": "PZ", "price": 4.29, "iva": 22}, {"cod": "CMAPL8", "desc": "SCIROPPO D'ACERO PURO 12X250ML", "um": "PZ", "price": 5.25, "iva": 10}, {"cod": "TSSRI6", "desc": "NANG-FAH SRIRACHA CHILI SAUCE 12x450ml", "um": "PZ", "price": 2.79, "iva": 10}, {"cod": "SAUCE1", "desc": "SAUCE CUP 2oz PP 20x50pz (60ml)", "um": "PZ", "price": 1.69, "iva": 22}, {"cod": "FRULAM", "desc": "FRUFRU LAMPONE CONGELATI RIC. CIOCCOLATO 16X140G", "um": "PZ", "price": 3.3, "iva": 10}, {"cod": "FRUFRA", "desc": "FRUFRU FRAGOLA CONGELATI RIC. CIOCCOLATO 16X140G", "um": "PZ", "price": 3.3, "iva": 10}, {"cod": "FABBRI", "desc": "FABBRI SIMPLE' BASEGEL 8x1500g", "um": "PZ", "price": 18.38, "iva": 10}],
+  products: [
+{"cod":"HAM001","desc":"SMASH BURGER B.A 90GR GELO 1X9KG","um":"KG","price":8.300,"iva":10},
+{"cod":"USMA01A","desc":"MARTINS FROZEN BREAD ROLL 4inch 12p 5x723g","um":"PZ","price":8.000,"iva":10},
+{"cod":"ICHED3","desc":"BURGERSLICES W/RED CHEDDAR 6X1,080KG/88PZ","um":"PZ","price":9.300,"iva":4},
+{"cod":"ICHED4","desc":"BURGERSLICES W/RED CHEDDAR 9X1,082KG/88PZ 60%","um":"PZ","price":9.300,"iva":4},
+{"cod":"FFW016","desc":"CHICKEN BURGER CORNFLAKES 14X950G","um":"PZ","price":7.100,"iva":10},
+{"cod":"FFW018","desc":"CHICKEN NUGGETS CORNFLAKES 12X1KG","um":"PZ","price":7.000,"iva":10},
+{"cod":"HAM010","desc":"KOKA CRISPY CHICKEN POPS 4X1KG","um":"PZ","price":7.200,"iva":10},
+{"cod":"IPINATA","desc":"LA PINATA CHEDDAR CHEESE SAUCE 6x3kg","um":"PZ","price":16.000,"iva":10},
+{"cod":"HEIN35","desc":"HEINZ MAIONESE AL TARTUFO TOPDOWN 8X220ml","um":"PZ","price":2.510,"iva":10},
+{"cod":"HEIN37","desc":"HEINZ SMOKEY BACONNAISE SQ. 6X1LT","um":"PZ","price":6.000,"iva":10},
+{"cod":"HEIN38","desc":"HEINZ BARBECUE SAUCE 2X2.15L","um":"PZ","price":9.500,"iva":10},
+{"cod":"HEIN40","desc":"HEINZ MAIONESE PROFESSIONAL SECCHIELLO 5L","um":"PZ","price":16.500,"iva":10},
+{"cod":"HEIN41","desc":"HEINZ MAIONESE DIP POT 25G 100PZX1CT","um":"PZ","price":20.990,"iva":10},
+{"cod":"HEIN42","desc":"HEINZ KETCHUP DIP POT 25G 100PZX1CT","um":"PZ","price":13.220,"iva":10},
+{"cod":"HEIN43","desc":"HEINZ KETCHUP PAIL 5.7kg","um":"PZ","price":14.990,"iva":10},
+{"cod":"IOLI38","desc":"OLIO SEMI DI GIRASOLE ALTO OLEICO BUNGE 2X10L","um":"PZ","price":20.990,"iva":4},
+{"cod":"ICAR01","desc":"CARTA BOBINA PRIME 168 (800STRAPPI) 2X1CNF","um":"PZ","price":4.290,"iva":22},
+{"cod":"CMAPL8","desc":"SCIROPPO D\'ACERO PURO 12X250ML","um":"PZ","price":5.250,"iva":10},
+{"cod":"TSSRI6","desc":"NANG-FAH SRIRACHA CHILI SAUCE 12x450ml","um":"PZ","price":2.790,"iva":10},
+{"cod":"SAUCE1","desc":"SAUCE CUP 2oz PP 20x50pz (60ml)","um":"PZ","price":1.690,"iva":22},
+{"cod":"FRULAM","desc":"FRUFRU LAMPONE CONGELATI RIC. CIOCCOLATO 16X140G","um":"PZ","price":3.300,"iva":10},
+{"cod":"FRUFRA","desc":"FRUFRU FRAGOLA CONGELATI RIC. CIOCCOLATO 16X140G","um":"PZ","price":3.300,"iva":10},
+{"cod":"FABBRI","desc":"FABBRI SIMPLE\' BASEGEL 8x1500g","um":"PZ","price":18.380,"iva":10}
+]
+};
+function loadDB(){try{const s=localStorage.getItem(DB_KEY);if(s){const d=JSON.parse(s);if(d.orders&&d.orders.length>0){if(!d.listino_concordato||!d.listino_concordato.length)d.listino_concordato=DB_DEFAULT.listino_concordato;return d;}}}catch(e){} return JSON.parse(JSON.stringify(DB_DEFAULT));}
+function saveDBLocal(){try{localStorage.setItem(DB_KEY,JSON.stringify(DB));}catch(e){}}
+
+const DB = loadDB();
+
+// Supabase sync
+async function sbLoadAll(){
+  try{
+    const [ordR,anomR,prodR] = await Promise.all([
+      SB('ut_orders?select=*&order=data.asc').then(r=>r.json()),
+      SB('ut_anomalies?select=*&order=id.asc').then(r=>r.json()),
+      SB('ut_products?select=*&order=id.asc').then(r=>r.json())
+    ]);
+    if(Array.isArray(ordR)&&ordR.length>0){
+      DB.orders=ordR.map(o=>({...o,lines:typeof o.lines==='string'?JSON.parse(o.lines):o.lines||[]}));
+      DB.anomalies=Array.isArray(anomR)?anomR.map(a=>({n:a.n||a.id,cat:a.cat,tipo:a.tipo,cert:a.cert,store:a.store,ordine:a.ordine,det:a.det})):DB.anomalies;
+      if(Array.isArray(prodR)&&prodR.length>0) DB.products=prodR.map(p=>({cod:p.cod,desc:p.descr,um:p.um,price:Number(p.price),iva:p.iva,updated:p.updated}));
+      saveDBLocal();
+      refreshAll();renderProds();renderCredito();
+      showStatus('✅ Dati caricati da Supabase','ok');
+    } else if(Array.isArray(ordR)&&ordR.length===0){
+      showStatus('☁️ Database Supabase vuoto — uso dati locali','info');
+    }
+  }catch(e){
+    console.warn('Supabase load failed',e);
+    showStatus('⚠️ Offline — uso dati locali','warn');
+  }
+}
+
+async function sbSaveOrder(ord){
+  try{
+    const row={id:ord.id,store:ord.store,data:ord.data,cons:ord.cons,op:ord.op||'',imp:ord.imp,iva_v:ord.iva_v,tot:ord.tot,source:ord.source||'pdf',pagamento:ord.pagamento||'',lines:JSON.stringify(ord.lines||[])};
+    await SB('ut_orders',{method:'POST',body:JSON.stringify(row),prefer:'return=representation,resolution=merge-duplicates',headers:{'Prefer':'return=representation,resolution=merge-duplicates'}});
+  }catch(e){console.warn('sbSaveOrder failed',e);}
+}
+
+async function sbSaveAnomaly(anom){
+  try{
+    const row={n:anom.n,cat:anom.cat,tipo:anom.tipo,cert:anom.cert,store:anom.store,ordine:anom.ordine,det:anom.det};
+    await SB('ut_anomalies',{method:'POST',body:JSON.stringify(row)});
+  }catch(e){console.warn('sbSaveAnomaly failed',e);}
+}
+
+async function sbSaveProduct(prod){
+  try{
+    const row={cod:prod.cod,descr:prod.desc,um:prod.um,price:prod.price,iva:prod.iva,updated:prod.updated||''};
+    const existing = await SB(`ut_products?cod=eq.${encodeURIComponent(prod.cod)}&select=id`).then(r=>r.json());
+    if(Array.isArray(existing)&&existing.length>0){
+      await SB(`ut_products?id=eq.${existing[0].id}`,{method:'PATCH',body:JSON.stringify(row)});
+    } else {
+      await SB('ut_products',{method:'POST',body:JSON.stringify(row)});
+    }
+  }catch(e){console.warn('sbSaveProduct failed',e);}
+}
+
+async function sbDeleteOrder(id){
+  try{
+    await SB(`ut_orders?id=eq.${encodeURIComponent(id)}`,{method:'DELETE'});
+    await SB(`ut_anomalies?ordine=eq.${encodeURIComponent(id)}`,{method:'DELETE'});
+  }catch(e){console.warn('sbDeleteOrder failed',e);}
+}
+
+async function sbSyncAll(){
+  showStatus('☁️ Salvataggio su Supabase...','info');
+  try{
+    await SB('ut_orders?id=neq.',{method:'DELETE'});
+    for(const o of DB.orders) await sbSaveOrder(o);
+    await SB('ut_anomalies?id=gt.0',{method:'DELETE'});
+    for(const a of DB.anomalies) await sbSaveAnomaly(a);
+    for(const p of DB.products) await sbSaveProduct(p);
+    showStatus('✅ Salvato su Supabase','ok');
+  }catch(e){
+    console.warn('sbSyncAll failed',e);
+    showStatus('⚠️ Errore Supabase — salvato localmente','warn');
+  }
+}
+
+function showStatus(msg,type){
+  const el=document.getElementById('syncStatus');
+  if(!el) return;
+  el.textContent=msg;
+  el.style.display='inline-block';
+  el.style.color=type==='ok'?'#a5d6a7':type==='warn'?'#ffe082':'#b3e5fc';
+  setTimeout(()=>{el.style.display='none'},4000);
+}
+
+function saveDB(){
+  saveDBLocal();
+  sbSyncAll();
+}
+
+let currentParsed = null;
+let multiQueue = [];
+
+// ============================================================
+// UTILITY
+const fmt = v => (v||0).toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtI = v => (v||0).toLocaleString('it-IT');
+function esc(s){ return (s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+function storePill(s) {
+  const cls = s.includes('TRAST') ? 'pTRASTEVERE' : s.includes('PIAZZA') ? 'pPIAZZA' : s.includes('PONTE') ? 'pPONTE' : 'pTUSCOLANA';
+  return `<span class="pill ${cls}">${s}</span>`;
+}
+function pillClass(store){
+  if(!store) return 'TRASTEVERE';
+  if(store.includes('TRASTEVERE')) return 'TRASTEVERE';
+  if(store.includes('PIAZZA')) return 'PIAZZA';
+  if(store.includes('PONTE')) return 'PONTE';
+  return 'TUSCOLANA';
+}
+function certBadge(c) {
+  if(c.includes('CERTA')) return '<span class="abadge a-certa">🔴 CERTA</span>';
+  return '<span class="abadge a-warn">🟡 DA VERIFICARE</span>';
+}
+function sourceBadge(s){ return s==='pdf'?'<span class="abadge" style="background:#dce6f1;color:#1f4e79">📄 PDF</span>':'<span class="abadge" style="background:#f0f0f0;color:#666">📦 storico</span>'; }
+
+// ============================================================
+// PARSERS (from original v5)
+function parseIT(s){ return parseFloat((s||'0').replace(/\./g,'').replace(',','.')); }
+function normDate(d){
+  if(!d) return '';
+  const p=d.split('/');
+  if(p.length===3 && p[2].length===2) p[2]='20'+p[2];
+  return p.join('/');
+}
+function normalizeStore(raw){
+  if(!raw) return '';
+  const u=raw.toUpperCase();
+  if(u.includes('PONTE MILVIO')) return 'PONTE MILVIO';
+  if(u.includes('PIAZZA ISTRIA')) return 'PIAZZA ISTRIA';
+  if(u.includes('SAN COSIMATO')||u.includes('TRASTEVERE')) return 'TRASTEVERE';
+  if(u.includes('TUSCOLANA')) return 'TUSCOLANA';
+  return raw.trim();
+}
+
+async function parsePDFText(text){
+  if(text.includes('Uniontrade') || text.includes('FATTURA') || text.includes('uniontrade'))
+    return parseUniotrade(text);
+  // Fallback generico
+  const dateM=text.match(/(\d{2}\/\d{2}\/\d{4})/);
+  const numM=text.match(/[Nn]umero[:\s]+(\w+)/);
+  let store='';
+  for(const kw of ['TUSCOLANA','PONTE MILVIO','PIAZZA ISTRIA','TRASTEVERE']){
+    if(text.toUpperCase().includes(kw)){store=normalizeStore(kw);break;}
+  }
+  return {fornitore:'Fornitore non riconosciuto — compilare manualmente',ordNum:numM?numM[1]:'',dataDoc:dateM?dateM[1]:'',dataOrd:dateM?dateM[1]:'',dataCons:'',store,operatore:'',pagamento:'',items:[],totImp:0,totIva:0,totDoc:0};
+}
+
+function parseUniotrade(text){
+  const lines=text.split('\n').map(l=>l.trim()).filter(Boolean);
+
+  // ---- NUMERO DOCUMENTO ----
+  // Formato: "Numero 15/0004064" oppure "15/0004064" sulla stessa riga o la successiva
+  let ordNum='';
+  const numM=text.match(/Numero\s+([\d\/]+)/);
+  if(numM) ordNum=numM[1];
+  if(!ordNum){
+    for(let i=0;i<lines.length;i++){
+      if(lines[i].toLowerCase().includes('numero')){
+        const m=lines[i].match(/([\d]{2,}\/[\d]{4,}|[\d]{5,})/);
+        if(m){ordNum=m[1];break;}
+        if(i+1<lines.length){const m2=lines[i+1].match(/([\d]{2,}\/[\d]{4,}|[\d]{5,})/);if(m2){ordNum=m2[1];break;}}
+      }
+    }
+  }
+
+  // ---- DATE ----
+  // Tutte le date nel documento
+  const allDates=[];
+  for(const m of text.matchAll(/(\d{2}\/\d{2}\/(?:20\d{2}|\d{2}))/g)){
+    let d=m[1];
+    // Normalizza aa → aaaa
+    const p=d.split('/');
+    if(p[2].length===2) p[2]='20'+p[2];
+    allDates.push({pos:m.index,d:p.join('/')});
+  }
+
+  // Data documento: prima data nel documento
+  const dataDoc=allDates.length>0?allDates[0].d:'';
+
+  // Data consegna: cerca "Tassativa" o "Data Consegna"
+  let dataCons='';
+  for(let i=0;i<lines.length;i++){
+    if(/tassativa/i.test(lines[i])){
+      const m=lines[i].match(/(\d{2}\/\d{2}\/(?:20\d{2}|\d{2}))/);
+      if(m){const p=m[1].split('/');if(p[2].length===2)p[2]='20'+p[2];dataCons=p.join('/');break;}
+      if(i+1<lines.length){const m2=lines[i+1].match(/(\d{2}\/\d{2}\/(?:20\d{2}|\d{2}))/);if(m2){const p=m2[1].split('/');if(p[2].length===2)p[2]='20'+p[2];dataCons=p.join('/');break;}}
+    }
+  }
+  if(!dataCons) dataCons=dataDoc;
+  const dataOrd=dataDoc;
+
+  // ---- STORE ----
+  let store='';
+  // "TISMASHO SRL - SAN COSIMATO" oppure "TISMASHO SRL - TRASTEVERE"
+  const storeM=text.match(/TISMASHO SRL\s*[-–]\s*(.+?)(?:\n|$)/i);
+  if(storeM) store=normalizeStore(storeM[1]);
+  if(!store){
+    for(const kw of ['SAN COSIMATO','TRASTEVERE','PONTE MILVIO','PIAZZA ISTRIA','TUSCOLANA']){
+      if(text.toUpperCase().includes(kw)){store=normalizeStore(kw);break;}
+    }
+  }
+
+  // ---- OPERATORE ----
+  let operatore='';
+  for(let i=0;i<lines.length;i++){
+    if(/operatore ordine/i.test(lines[i])||/operatore/i.test(lines[i])){
+      // Cerca nome nelle righe successive (pattern nome cognome con apostrofo ammesso)
+      for(let j=i+1;j<Math.min(i+6,lines.length);j++){
+        if(/^[A-ZÀÈÉÌÒÙ][a-zàèéìòùA-Z']+(?:\s+[A-ZÀÈÉÌÒÙ][a-zàèéìòùA-Z']+)+$/.test(lines[j])
+          && !/(EURO|EUR|VENDITA|FRANCO|VETTORE|Valuta)/i.test(lines[j])){
+          operatore=lines[j];break;
+        }
+      }
+      // Cerca anche sulla stessa riga dopo keyword
+      const sameM=lines[i].match(/Operatore Ordine\s+(.+)/i);
+      if(sameM && !operatore) operatore=sameM[1].trim();
+      if(operatore) break;
+    }
+  }
+  // Fallback: cerca "Francesca" o altri nomi comuni
+  if(!operatore){
+    for(const l of lines){
+      if(/^[A-ZÀÈÉÌÒÙ][a-zàèéìòù']+\s+[A-ZÀÈÉÌÒÙ][a-zàèéìòù']+$/.test(l) && l.length<40){
+        if(!/(Uniontrade|Peschiera|Borromeo|Belsiana|Cosimato|Barone|Sebastiano|Milano|ITALIA)/i.test(l)){
+          operatore=l;break;
+        }
+      }
+    }
+  }
+
+  // ---- PAGAMENTO ----
+  let pagamento='';
+  for(let i=0;i<lines.length;i++){
+    if(/^pagamento$/i.test(lines[i])){
+      if(i+1<lines.length && lines[i+1].length>1 && !/^(Data|Banca|A Mezzo|Vettore)/i.test(lines[i+1])){
+        pagamento=lines[i+1];break;
+      }
+    }
+    const pm=lines[i].match(/^Pagamento\s+(.+)/i);
+    if(pm){pagamento=pm[1].trim();break;}
+  }
+
+  // ---- ARTICOLI ----
+  // Trova inizio sezione articoli: riga header "Articolo Descrizione UM Quantità..."
+  // oppure prima riga che corrisponde a un codice prodotto
+  let artStart=-1;
+  for(let i=0;i<lines.length;i++){
+    if(/^Articolo\s+Descrizione/i.test(lines[i])||lines[i].startsWith('Articolo')){
+      artStart=i+1;break;
+    }
+  }
+  // Trova fine sezione articoli: riga "Totale Merce" o "CONTRIBUTO CONAI"
+  let artEnd=lines.length;
+  for(let i=artStart>0?artStart:0;i<lines.length;i++){
+    if(/Totale Merce|CONTRIBUTO CONAI|Netto a Pagare|Cod\.IVA|Peso Lordo/i.test(lines[i])){
+      artEnd=i;break;
+    }
+  }
+
+  const artLines=artStart>=0?lines.slice(artStart,artEnd):lines;
+
+  // Codice articolo: es. FFW016, USMA01A, HAM001
+  const codRe=/^([A-Z]{2,6}\d{2,6}[A-Z]?)$/;
+  const umRe=/^(PZ|KG|LT|CT|CF|SC|BT|NR|FL|GR|ML)$/;
+
+  const items=[];
+  let i=0;
+  while(i<artLines.length){
+    const l=artLines[i];
+    if(!codRe.test(l)){i++;continue;}
+
+    const codice=l;
+    i++;
+
+    // Raccoglie descrizione: righe fino a UM o numero
+    const descParts=[];
+    while(i<artLines.length){
+      const cur=artLines[i];
+      if(codRe.test(cur)) break; // prossimo codice
+      if(umRe.test(cur)) break;  // trovata UM
+      // Riga con UM inline: "CHICKEN BURGER ... PZ 14,000 7,100 ..."
+      const inlineM=cur.match(/^(.+?)\s+(PZ|KG|LT|CT|CF|SC|BT|NR)\s+([\d,]+)\s+([\d,]+)(?:\s+([\d,]+))?\s+([\d.,]+)\s+(\d+)$/);
+      if(inlineM){
+        descParts.push(inlineM[1]);
+        // Parsa direttamente
+        const um=inlineM[2];
+        const qta=parseIT(inlineM[3]);
+        const prezzo=parseIT(inlineM[4]);
+        const prezzo_netto=inlineM[5]?parseIT(inlineM[5]):prezzo;
+        const importo=parseIT(inlineM[6]);
+        const iva=parseInt(inlineM[7]);
+        items.push({codice,desc:descParts.join(' ').trim(),um,qta,prezzo,prezzo_netto,importo,iva});
+        i++;
+        descParts.length=0; // reset per non aggiungere doppie
+        break;
+      }
+      // Salta righe di lotto/scadenza/tariff
+      if(/N°\s*lotto|Tariff Code|^\d{2}\/\d{2}\/\d{4}$|^[A-Z]{2}\d{2}[A-Z]\d{7}/.test(cur)){i++;continue;}
+      descParts.push(cur);
+      i++;
+    }
+
+    // Se la descrizione è già stata parsata inline, continua
+    if(descParts.length===0) continue;
+
+    const desc=descParts.join(' ').trim();
+
+    // UM
+    let um='PZ';
+    if(i<artLines.length && umRe.test(artLines[i])){um=artLines[i];i++;}
+
+    // QTÀ
+    let qta=0;
+    if(i<artLines.length && /^\d+[,\.]\d+$/.test(artLines[i])){qta=parseIT(artLines[i]);i++;}
+
+    // PREZZO
+    let prezzo=0;
+    if(i<artLines.length && /^\d+[,\.]\d+$/.test(artLines[i])){prezzo=parseIT(artLines[i]);i++;}
+
+    // SCONTI (opzionale, salta se presente)
+    // PREZZO NETTO
+    let prezzo_netto=prezzo;
+    if(i<artLines.length && /^\d+[,\.]\d+$/.test(artLines[i])){prezzo_netto=parseIT(artLines[i]);i++;}
+
+    // IMPORTO + IVA ("99,40 10" oppure su due righe)
+    let importo=0,iva=10;
+    if(i<artLines.length){
+      const m=artLines[i].match(/^([\d.]+,\d{2})\s+(\d{1,2})$/);
+      if(m){importo=parseIT(m[1]);iva=parseInt(m[2]);i++;}
+      else if(/^[\d.]+,\d{2}$/.test(artLines[i])){
+        importo=parseIT(artLines[i]);i++;
+        if(i<artLines.length && /^\d{1,2}$/.test(artLines[i])){iva=parseInt(artLines[i]);i++;}
+      }
+    }
+    if(importo===0 && qta>0 && prezzo_netto>0) importo=Math.round(qta*prezzo_netto*100)/100;
+
+    // Salta righe lotto/scadenza tra articoli
+    while(i<artLines.length && /N°\s*lotto|Tariff Code|^\d{2}\/\d{2}\/\d{4}$/.test(artLines[i])){i++;}
+
+    items.push({codice,desc,um,qta,prezzo,prezzo_netto,importo,iva});
+  }
+
+  // ---- ARTICOLI: tentativo parsing inline (righe complete) ----
+  // pdf.js spesso restituisce righe complete tipo: "FFW016 CHICKEN BURGER PZ 14,000 7,100 7,100 99,40 10"
+  // Tentiamo prima questo approccio più affidabile
+  const inlineItems=[];
+  for(const l of artLines){
+    // Pattern: CODICE descrizione UM qtà prezzo [sconti] prezzoNetto importo iva
+    const m=l.match(/^([A-Z]{2,6}\d{2,6}[A-Z]?)\s+(.+?)\s+(PZ|KG|LT|CT|CF|SC|BT|NR)\s+([\d,]+)\s+([\d,]+)(?:\s+[\d,]+)?\s+([\d,]+)\s+([\d.,]+)\s+(\d{1,2})$/);
+    if(m){
+      inlineItems.push({
+        codice:m[1],
+        desc:m[2].trim(),
+        um:m[3],
+        qta:parseIT(m[4]),
+        prezzo:parseIT(m[5]),
+        prezzo_netto:parseIT(m[6]),
+        importo:parseIT(m[7]),
+        iva:parseInt(m[8])
+      });
+    }
+  }
+
+  // Usa inline se ha trovato almeno un articolo, altrimenti usa parsing per token
+  const finalItems = inlineItems.length > 0 ? inlineItems : items;
+  const napM=text.match(/Netto a Pagare\s*([\d.]+,\d{2})/)||text.match(/Netto a Pagare[\s\S]{0,30}?([\d.]+,\d{2})/);
+  const ivaM=text.match(/Totale IVA\s*([\d.]+,\d{2})/)||text.match(/Totale IVA[\s\S]{0,20}?([\d.]+,\d{2})/);
+  const totDoc=napM?parseIT(napM[1]):0;
+  const totIva=ivaM?parseIT(ivaM[1]):0;
+  const totImp=Math.round(finalItems.reduce((s,it)=>s+it.importo,0)*100)/100;
+
+  return {
+    fornitore:'Uniontrade Spa',
+    ordNum,dataDoc,dataOrd,dataCons,store,operatore,pagamento,
+    items:finalItems,totImp,
+    totIva:totIva||Math.round(totImp*0.1*100)/100,
+    totDoc:totDoc||Math.round((totImp+(totIva||totImp*0.1))*100)/100,
+    _rawText:text
+  };
+}
+
+async function extractPDFText(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=async(e)=>{
+      try{
+        // Ensure worker is set
+        if(pdfjsLib.GlobalWorkerOptions && !pdfjsLib.GlobalWorkerOptions.workerSrc){
+          pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        }
+        const pdf=await pdfjsLib.getDocument({data:e.target.result}).promise;
+        let fullText='';
+        for(let p=1;p<=pdf.numPages;p++){
+          const page=await pdf.getPage(p);
+          const tc=await page.getTextContent();
+          // Group items by their Y coordinate (rounded to nearest 3px) to detect rows
+          // In PDF coordinate space, Y increases upward, so sort descending by Y for top-to-bottom order
+          const rows={};
+          for(const item of tc.items){
+            if(!item.str||!item.str.trim()) continue;
+            // Round Y to nearest 4px to group same-line items together
+            const y=Math.round(item.transform[5]/4)*4;
+            const x=item.transform[4];
+            if(!rows[y]) rows[y]=[];
+            rows[y].push({x,str:item.str.trim()});
+          }
+          // Sort rows top-to-bottom (PDF y goes up, so we sort descending)
+          const sortedYs=Object.keys(rows).map(Number).sort((a,b)=>b-a);
+          for(const y of sortedYs){
+            // Sort items within a row left-to-right
+            const line=rows[y].sort((a,b)=>a.x-b.x).map(i=>i.str).join(' ');
+            fullText+=line+'\n';
+          }
+          fullText+='\f';
+        }
+        resolve(fullText);
+      }catch(err){reject(err)}
+    };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+// ============================================================
+// PDF UI HANDLERS
+function dzOver(e){e.preventDefault();document.getElementById('dz').classList.add('drag')}
+function dzLeave(){document.getElementById('dz').classList.remove('drag')}
+function dzDrop(e){e.preventDefault();dzLeave();const f=e.dataTransfer.files[0];if(f)processPDF(f)}
+async function loadPDF(e){const f=e.target.files[0];if(f)await processPDF(f);e.target.value='';}
+
+async function processPDF(file){
+  setStep(1,'active');
+  const dz=document.getElementById('dz');
+  const prog=document.getElementById('progWrap');
+  document.getElementById('parseError').innerHTML='';
+  prog.style.display='block';
+  setProgress(10,'Lettura file PDF...');
+  dz.querySelector('.dz-file').textContent=file.name;
+  try{
+    setProgress(30,'Estrazione testo...');
+    const rawText=await extractPDFText(file);
+    // Show debug panel with raw text
+    const dbg=document.getElementById('debugText');
+    if(dbg){dbg.value=rawText;document.getElementById('debugPanel').style.display='block';}
+    setProgress(60,'Analisi campi...');
+    const parsed=await parsePDFText(rawText);
+    setProgress(90,'Controllo anomalie...');
+    currentParsed=parsed;
+    showPreview(parsed);
+    setProgress(100,'✅ Completato');
+    setTimeout(()=>{prog.style.display='none'},1200);
+  }catch(err){
+    prog.style.display='none';
+    document.getElementById('parseError').innerHTML=`<div class="alert alert-err mt8">❌ Errore lettura PDF: ${err.message}</div>`;
+    dz.classList.add('error');
+    setTimeout(()=>dz.classList.remove('error'),3000);
+  }
+}
+
+function setProgress(p,label){document.getElementById('progFill').style.width=p+'%';document.getElementById('progLabel').textContent=label;}
+
+function showPreview(p){
+  setStep(2,'active');setStep(1,'done');
+  document.getElementById('step1Block').style.display='none';
+  document.getElementById('step2Block').style.display='block';
+  document.getElementById('step3Block').style.display='none';
+  const fBadgeColors={'Uniontrade Spa':'background:#dce6f1;color:#1f4e79'};
+  const fStyle=fBadgeColors[p.fornitore]||'background:#f0f0f0;color:#444';
+  document.getElementById('step2Head').innerHTML=`<span>✅ Dati estratti — <span style="padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700;${fStyle}">${p.fornitore||'Sconosciuto'}</span></span>
+    <button class="btn btn-ghost btn-sm" style="color:#fff;border-color:rgba(255,255,255,.5)" onclick="backToStep1()">← Carica altro</button>`;
+  document.getElementById('prev_num').value=p.ordNum||'';
+  document.getElementById('prev_store').value=p.store||'PONTE MILVIO';
+  document.getElementById('prev_data').value=p.dataOrd||'';
+  document.getElementById('prev_cons').value=p.dataCons||'';
+  document.getElementById('prev_op').value=p.operatore||'';
+  document.getElementById('prev_pag').value=p.pagamento||'';
+  renderPreviewRows(p.items);
+  updatePreviewTotals();
+  runAnomalyCheck(p);
+}
+
+function renderPreviewRows(items){
+  document.getElementById('prevRows').innerHTML=items.map((it,i)=>`
+    <tr>
+      <td class="tc muted">${i+1}</td>
+      <td style="font-size:10px;color:var(--muted)">${it.codice}</td>
+      <td><input value="${esc(it.desc)}" onchange="updateItem(${i},'desc',this.value)" style="min-width:280px"></td>
+      <td><input value="${it.um}" onchange="updateItem(${i},'um',this.value)" style="width:45px;text-align:center"></td>
+      <td><input type="number" value="${it.qta}" step="0.001" onchange="updateItem(${i},'qta',+this.value);updatePreviewTotals()" style="width:65px;text-align:right"></td>
+      <td><input type="number" value="${it.prezzo_netto}" step="0.001" onchange="updateItem(${i},'prezzo_netto',+this.value);updateItem(${i},'importo',+(this.value*currentParsed.items[${i}].qta).toFixed(2));updatePreviewTotals()" style="width:75px;text-align:right"></td>
+      <td class="tc">${it.iva}%</td>
+      <td class="tr fb">${fmt(it.importo)}</td>
+      <td><button onclick="removeItem(${i})" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:15px;padding:2px 5px">✕</button></td>
+    </tr>`).join('');
+  updatePreviewTotals();
+}
+function updateItem(i,field,val){if(currentParsed&&currentParsed.items[i]) currentParsed.items[i][field]=val;}
+function removeItem(i){if(currentParsed){currentParsed.items.splice(i,1);renderPreviewRows(currentParsed.items);runAnomalyCheck(currentParsed);}}
+function addPrevRow(){
+  if(!currentParsed) return;
+  currentParsed.items.push({codice:'',desc:'',um:'PZ',qta:0,prezzo:0,prezzo_netto:0,importo:0,iva:10});
+  renderPreviewRows(currentParsed.items);
+}
+function updatePreviewTotals(){
+  if(!currentParsed) return;
+  const totImp=currentParsed.items.reduce((s,i)=>s+i.importo,0);
+  const totIva=currentParsed.items.reduce((s,i)=>s+i.importo*(i.iva/100),0);
+  const totDoc=totImp+totIva;
+  document.getElementById('prevTotImp').textContent='€ '+fmt(totImp);
+  document.getElementById('prevTotals').innerHTML=`
+    <span style="margin-right:16px">Imponibile: <strong>€ ${fmt(totImp)}</strong></span>
+    <span style="margin-right:16px">IVA: <strong>€ ${fmt(totIva)}</strong></span>
+    <span style="font-size:14px;color:var(--green)">Totale: <strong>€ ${fmt(totDoc)}</strong></span>`;
+  currentParsed.totImp=Math.round(totImp*100)/100;
+  currentParsed.totIva=Math.round(totIva*100)/100;
+  currentParsed.totDoc=Math.round(totDoc*100)/100;
+}
+function runAnomalyCheck(p){
+  const warns=[];
+  const existing=DB.orders.find(o=>String(o.id)===String(p.ordNum));
+  if(existing)
+    warns.push({type:'err',msg:`⚠️ Ordine <strong>${p.ordNum}</strong> già presente (${existing.store}, ${existing.data}, €${fmt(existing.tot)}, ${(existing.lines||[]).length} righe).<br>Salvando <strong>sovrascriverai</strong> l'ordine esistente.`});
+  if(!p.store) warns.push({type:'err',msg:'❌ Store non rilevato — selezionalo manualmente.'});
+  for(const item of p.items){
+    const lc=(DB.listino_concordato||[]).find(pr=>pr.cod===item.codice||pr.desc===item.desc||(item.desc&&item.desc.startsWith(pr.desc.substring(0,25))));
+    if(lc&&item.prezzo_netto&&Math.abs(item.prezzo_netto-lc.price)>0.01)
+      warns.push({type:'warn',msg:`⚠️ Prezzo diverso dal listino concordato: <strong>${item.desc.substring(0,50)}</strong> — Ordine: €${item.prezzo_netto} | Concordato: €${lc.price} (${item.prezzo_netto>lc.price?'+':''}€${(item.prezzo_netto-lc.price).toFixed(3)})`});
+  }
+  if(!p.dataCons||p.dataCons==='N/D') warns.push({type:'warn',msg:'🟡 Data consegna mancante.'});
+  if(p.items.length===0) warns.push({type:'err',msg:'❌ Nessun articolo rilevato.'});
+  const el=document.getElementById('anomalyCheck');
+  if(warns.length===0) el.innerHTML=`<div class="alert alert-ok">✅ Nessuna anomalia — ${p.items.length} articoli, totale €${fmt(p.totDoc)}</div>`;
+  else el.innerHTML=warns.map(w=>`<div class="alert ${w.type==='err'?'alert-err':'alert-warn'}">${w.msg}</div>`).join('');
+}
+
+function confirmSave(){
+  const ordNum=document.getElementById('prev_num').value.trim();
+  const store=document.getElementById('prev_store').value;
+  const dataOrd=document.getElementById('prev_data').value;
+  const dataCons=document.getElementById('prev_cons').value||'N/D';
+  const op=document.getElementById('prev_op').value;
+  if(!ordNum||!store||!dataOrd){document.getElementById('anomalyCheck').innerHTML=`<div class="alert alert-err">❌ Numero ordine, store e data obbligatori.</div>`;return;}
+  const existIdx=DB.orders.findIndex(o=>String(o.id)===ordNum);
+  const p=currentParsed;
+  const totImp=p.items.reduce((s,i)=>s+i.importo,0);
+  const totIva=p.items.reduce((s,i)=>s+i.importo*(i.iva/100),0);
+  const totDoc=totImp+totIva;
+  const newOrd={id:ordNum,store,data:dataOrd,cons:dataCons,op:op||'N/D',
+    imp:Math.round(totImp*100)/100,iva_v:Math.round(totIva*100)/100,tot:Math.round(totDoc*100)/100,
+    lines:p.items,source:'pdf',pagamento:p.pagamento};
+  if(existIdx>=0) DB.orders[existIdx]=newOrd; else DB.orders.push(newOrd);
+  // Add new anomalies — verifica vs listino concordato
+  for(const item of p.items){
+    const lc=(DB.listino_concordato||[]).find(pr=>pr.cod===item.codice||pr.desc===item.desc||(item.desc&&item.desc.startsWith(pr.desc.substring(0,25))));
+    if(lc&&item.prezzo_netto&&Math.abs(item.prezzo_netto-lc.price)>0.01){
+      const diff=item.prezzo_netto-lc.price;
+      DB.anomalies.push({n:DB.anomalies.length+1,cat:'PREZZO',tipo:'Prezzo diverso dal listino concordato',cert:'🔴 CERTA',store,ordine:ordNum,det:`${item.desc}\nOrdine €${item.prezzo_netto} vs concordato €${lc.price} (${diff>0?'+':''}€${diff.toFixed(3)})`});
+    }
+  }
+  if(!dataCons||dataCons==='N/D')
+    DB.anomalies.push({n:DB.anomalies.length+1,cat:'DATI MANCANTI',tipo:'Data consegna mancante',cert:'🔴 CERTA',store,ordine:ordNum,det:'Data consegna mancante'});
+  // Ordina tutti gli ordini per data (più vecchi prima)
+  DB.orders.sort((a,b)=>{
+    const da=(a.data||'').split('/').reverse().join('');
+    const db=(b.data||'').split('/').reverse().join('');
+    return da.localeCompare(db);
+  });
+  refreshAll();
+  setStep(3,'active');setStep(2,'done');
+  document.getElementById('step2Block').style.display='none';
+  document.getElementById('step3Block').style.display='block';
+  const nAnoms=DB.anomalies.filter(a=>a.ordine===ordNum).length;
+  document.getElementById('saveConfirmMsg').innerHTML=`
+    <div class="alert alert-ok">✅ Ordine <strong>${ordNum}</strong> salvato — ${storePill(store)}
+    &nbsp;·&nbsp;${dataOrd} → ${dataCons}&nbsp;·&nbsp;${op}
+    &nbsp;·&nbsp;<strong>${p.items.length}</strong> articoli&nbsp;·&nbsp;Totale: <strong>€ ${fmt(totDoc)}</strong>
+    ${nAnoms>0?`<br><span class="abadge a-warn mt8">⚠️ ${nAnoms} anomalia/e</span>`:''}</div>`;
+  if(multiQueue.length>0) setTimeout(processNextInQueue,800);
+}
+
+function backToStep1(){
+  setStep(1,'active');setStep(2,'');setStep(3,'');
+  document.getElementById('step1Block').style.display='block';
+  document.getElementById('step2Block').style.display='none';
+  document.getElementById('step3Block').style.display='none';
+  currentParsed=null;
+}
+function setStep(n,cls){document.getElementById('st'+n).className='step'+(cls?' '+cls:'');}
+
+// Multi-file — auto-salva senza chiedere conferma
+async function loadMulti(e){multiQueue=[...e.target.files];e.target.value='';renderQueue();if(multiQueue.length>0) processNextInQueue();}
+async function processNextInQueue(){
+  if(multiQueue.length===0) return;
+  const file=multiQueue.shift();
+  renderQueue();
+  await processPDF(file);
+  if(currentParsed){
+    const numFattura=String(currentParsed.ordNum||'');
+    if(numFattura && DB.orders.find(o=>String(o.id)===numFattura)){
+      showStatus(`⚠️ Ordine #${numFattura} già presente — saltato`,'warn');
+      currentParsed=null;
+      if(multiQueue.length>0) setTimeout(processNextInQueue,600);
+      return;
+    }
+    confirmSave();
+  }
+}
+function renderQueue(){
+  const el=document.getElementById('multiQueue');
+  if(multiQueue.length===0){el.innerHTML='';return;}
+  el.innerHTML=`<div class="alert alert-info">📦 In coda: <strong>${multiQueue.length}</strong> PDF — ${multiQueue.map(f=>f.name).join(', ')}</div>`;
+}
+
+// ============================================================
+// PRODUCT MODAL / LISTINO
+function renderProds(){
+  document.getElementById('prodBody').innerHTML=DB.products.map((p,i)=>`
+    <tr><td class="tc muted">${i+1}</td><td style="font-size:10px;color:var(--muted)">${p.cod||'—'}</td>
+    <td class="fb">${p.desc}</td><td class="tc">${p.um}</td><td class="tr fb mono">€${p.price.toFixed(3)}</td><td class="tc">${p.iva}%</td>
+    <td><button class="btn btn-ghost btn-sm" onclick="editProd(${i})">✏️</button></td></tr>`).join('');
+}
+function openProdModal(idx=-1){
+  document.getElementById('mp_idx').value=idx;
+  if(idx>=0){const p=DB.products[idx];document.getElementById('mp_cod').value=p.cod||'';document.getElementById('mp_desc').value=p.desc||'';document.getElementById('mp_um').value=p.um||'PZ';document.getElementById('mp_price').value=p.price||'';document.getElementById('mp_iva').value=p.iva||10;}
+  else{['mp_cod','mp_desc','mp_price'].forEach(id=>document.getElementById(id).value='');}
+  document.getElementById('prodModal').classList.add('open');
+}
+function editProd(i){openProdModal(i);}
+function closeProdModal(){document.getElementById('prodModal').classList.remove('open');}
+function saveProd(){
+  const idx=parseInt(document.getElementById('mp_idx').value);
+  const obj={cod:document.getElementById('mp_cod').value.trim(),desc:document.getElementById('mp_desc').value.trim(),um:document.getElementById('mp_um').value,price:parseFloat(document.getElementById('mp_price').value)||0,iva:parseInt(document.getElementById('mp_iva').value),updated:new Date().toLocaleDateString('it-IT')};
+  if(!obj.desc||!obj.price){alert('Descrizione e prezzo obbligatori');return;}
+  if(idx>=0) DB.products[idx]=obj; else DB.products.push(obj);
+  saveDB();renderProds();closeProdModal();
+}
+
+// ============================================================
+// EXPORT EXCEL
+function exportExcel(){
+  const wb=XLSX.utils.book_new();
+  const stores=['TRASTEVERE','PIAZZA ISTRIA','PONTE MILVIO','TUSCOLANA'];
+  for(const store of stores){
+    const ords=DB.orders.filter(o=>o.store===store).sort((a,b)=>(a.data||'').localeCompare(b.data||''));
+    const data=[['N° Ordine','Data Ordine','Data Cons.','Operatore','Descrizione','UM','Qtà','Prezzo Netto €','IVA %','Importo €','Totale Doc €']];
+    for(const o of ords){
+      const lines=o.lines||[];
+      if(lines.length>0){lines.forEach((l,i)=>{if(i===0) data.push([o.id,o.data,o.cons,o.op,l.desc,l.um,l.qta,l.prezzo_netto||l.prezzo,l.iva,l.importo,o.tot]);else data.push([null,null,null,null,l.desc,l.um,l.qta,l.prezzo_netto||l.prezzo,l.iva,l.importo,null]);});}
+      else data.push([o.id,o.data,o.cons,o.op,null,null,null,null,null,null,o.tot]);
+    }
+    const ws=XLSX.utils.aoa_to_sheet(data);
+    ws['!cols']=[{wch:12},{wch:12},{wch:12},{wch:20},{wch:44},{wch:5},{wch:7},{wch:12},{wch:7},{wch:10},{wch:13}];
+    XLSX.utils.book_append_sheet(wb,ws,store);
+  }
+  const rt=[['Store','N° Ordine','Data','Cons.','Operatore','Fonte','Imponibile €','IVA €','Totale €']];
+  let sI=0,sV=0,sT=0;
+  DB.orders.sort((a,b)=>(a.data||'').localeCompare(b.data||'')).forEach(o=>{
+    const i=o.imp||0,v=o.iva_v||0,t=o.tot||0;
+    rt.push([o.store,o.id,o.data,o.cons,o.op,o.source,i,v,t]);sI+=i;sV+=v;sT+=t;
+  });
+  rt.push(['TOTALE','','','','','',Math.round(sI*100)/100,Math.round(sV*100)/100,Math.round(sT*100)/100]);
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rt),'RIEPILOGO TOTALE');
+  XLSX.writeFile(wb,`tismasho_master_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+// ============================================================
+// TAB NAVIGATION
+function showTab(id){
+  const ids=['dashboard','carica','store','ordini','settimane','anomalie','credito','listino_concordato','listino'];
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',ids[i]===id));
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  if(id==='store') renderStoreDetail();
+  if(id==='settimane') renderWeekly();
+  if(id==='listino') renderProds();
+  if(id==='credito') renderCredito();
+  if(id==='listino_concordato') renderListinoConcordato();
+}
+
+// ============================================================
+// DASHBOARD RENDER
+function renderDashboard(){
+  const totOrd=DB.orders.length;
+  const totLines=DB.orders.reduce((s,o)=>s+(o.lines||[]).length,0);
+  const totImp=DB.orders.reduce((s,o)=>s+(o.imp||0),0);
+  const totIva=DB.orders.reduce((s,o)=>s+(o.iva_v||0),0);
+  const totTot=DB.orders.reduce((s,o)=>s+(o.tot||0),0);
+  const pdfCount=DB.orders.filter(o=>o.source==='pdf').length;
+  document.getElementById('statsGrid').innerHTML=`
+    <div class="stat"><div class="stat-lbl">Ordini totali</div><div class="stat-val">${totOrd}</div><div class="stat-sub">4 store · ${pdfCount} da PDF</div></div>
+    <div class="stat b"><div class="stat-lbl">Righe prodotto</div><div class="stat-val">${totLines}</div><div class="stat-sub">media ${(totLines/totOrd).toFixed(1)}/ordine</div></div>
+    <div class="stat"><div class="stat-lbl">Imponibile</div><div class="stat-val">€${fmt(totImp)}</div><div class="stat-sub">netto IVA</div></div>
+    <div class="stat o"><div class="stat-lbl">Anomalie</div><div class="stat-val">${DB.anomalies.length}</div><div class="stat-sub">${DB.anomalies.filter(a=>a.cert&&a.cert.includes('CERTA')).length} certe</div></div>
+    <div class="stat r"><div class="stat-lbl">Totale complessivo</div><div class="stat-val">€${fmt(totTot)}</div><div class="stat-sub">IVA inclusa</div></div>`;
+  // Riepilogo per store
+  const totComp=DB.riepilogo.find(r=>r.store.includes('TOTALE'));
+  const storeR=DB.riepilogo.filter(r=>!r.store.includes('TOTALE'));
+  document.getElementById('riepilogoBody').innerHTML=storeR.map(r=>`<tr>
+    <td>${storePill(r.store)}</td><td class="tc mono">${r.n_ordini}</td>
+    <td class="tr mono">€${fmt(r.imp)}</td><td class="tr mono">€${fmt(r.iva)}</td>
+    <td class="tr mono fb">€${fmt(r.tot)}</td><td class="tr mono">${(r.tot/totComp.tot*100).toFixed(1)}%</td></tr>`).join('');
+  document.getElementById('riepilogoFoot').innerHTML=`<tr><td class="fb">TOTALE</td><td class="tc fb mono">${totComp.n_ordini}</td><td class="tr fb mono">€${fmt(totComp.imp)}</td><td class="tr fb mono">€${fmt(totComp.iva)}</td><td class="tr fb mono">€${fmt(totComp.tot)}</td><td class="tr fb mono">100%</td></tr>`;
+  // Anomalies summary
+  const certCount=DB.anomalies.filter(a=>a.cert&&a.cert.includes('CERTA')).length;
+  const verCount=DB.anomalies.filter(a=>a.cert&&a.cert.includes('VERIFICARE')).length;
+  let ah=`<div style="margin-bottom:12px"><span class="abadge a-certa">🔴 ${certCount} certe</span> &nbsp; <span class="abadge a-warn">🟡 ${verCount} da verificare</span></div>`;
+  DB.anomalies.slice(0,8).forEach(a=>{ah+=`<div style="padding:6px 0;border-bottom:1px solid #f0f1f3;font-size:11px">${certBadge(a.cert)} <span class="fb">${a.cat}</span> — ${(a.det||'').split('\n')[0].substring(0,80)}</div>`;});
+  ah+=`<div class="mt8"><button class="btn btn-ghost btn-sm" onclick="showTab('anomalie')">Tutte le ${DB.anomalies.length} anomalie →</button></div>`;
+  document.getElementById('dashAnom').innerHTML=ah;
+  // Orders
+  const sorted=[...DB.orders].sort((a,b)=>(b.data||'').localeCompare(a.data||''));
+  document.getElementById('dashOrders').innerHTML=sorted.slice(0,15).map(o=>`<tr>
+    <td class="fb mono">${o.id}</td><td>${storePill(o.store)}</td><td>${o.data}</td><td>${o.cons||'—'}</td><td>${o.op}</td><td class="tc">${(o.lines||[]).length}</td>
+    <td class="tr mono">€${fmt(o.imp)}</td><td class="tr mono">€${fmt(o.iva_v)}</td><td class="tr mono fb">€${fmt(o.tot)}</td><td>${sourceBadge(o.source)}</td></tr>`).join('');
+  document.getElementById('topbarInfo').textContent=`Uniontrade Spa · FEBBRAIO 2026 · ${totOrd} ordini · ${pdfCount} da PDF · 4 store`;
+  document.getElementById('anomBadge').textContent=DB.anomalies.length;
+}
+
+// ============================================================
+// STORE DETAIL
+function renderStoreDetail(){
+  const store=document.getElementById('storeFilter').value;
+  const ords=DB.orders.filter(o=>o.store===store).sort((a,b)=>(a.data||'').localeCompare(b.data||''));
+  const totImp=ords.reduce((s,o)=>s+(o.imp||0),0);
+  const totTot=ords.reduce((s,o)=>s+(o.tot||0),0);
+  const totLines=ords.reduce((s,o)=>s+(o.lines||[]).length,0);
+  let html=`<div class="stats" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px">
+    <div class="stat"><div class="stat-lbl">Ordini</div><div class="stat-val">${ords.length}</div></div>
+    <div class="stat b"><div class="stat-lbl">Righe</div><div class="stat-val">${totLines}</div></div>
+    <div class="stat"><div class="stat-lbl">Imponibile</div><div class="stat-val">€${fmt(totImp)}</div></div>
+    <div class="stat o"><div class="stat-lbl">Totale</div><div class="stat-val">€${fmt(totTot)}</div></div></div>`;
+  ords.forEach(o=>{
+    const lines=o.lines||[];
+    html+=`<div class="card"><div class="card-head neutral expand-btn" onclick="this.nextElementSibling.classList.toggle('open')">
+      <span>📦 <strong class="mono">${o.id}</strong> — ${o.data} — ${o.op} — <strong>€${fmt(o.tot)}</strong> (${lines.length} righe) ${sourceBadge(o.source)}</span><span style="font-size:18px">▸</span>
+    </div><div class="expand-content"><div style="padding:12px 16px;font-size:11px;color:var(--muted)">Data: ${o.data} · Cons: ${o.cons||'N/D'} · Op: ${o.op} · Imp: €${fmt(o.imp)} · IVA: €${fmt(o.iva_v)}</div>
+    <div class="scroll-x"><table class="dtable"><thead><tr><th>#</th><th>Descrizione</th><th>UM</th><th class="tr">Qtà</th><th class="tr">Prezzo €</th><th class="tc">IVA %</th><th class="tr">Importo €</th></tr></thead>
+    <tbody>${lines.map((l,i)=>`<tr><td class="tc muted">${i+1}</td><td class="fb">${l.desc}</td><td class="tc">${l.um}</td><td class="tr mono">${fmtI(l.qta)}</td><td class="tr mono">€${fmt(l.prezzo)}</td><td class="tc">${l.iva}%</td><td class="tr mono fb">€${fmt(l.importo)}</td></tr>`).join('')}</tbody>
+    <tfoot><tr><td colspan="6" class="tr fb">TOTALE</td><td class="tr fb mono">€${fmt(lines.reduce((s,l)=>s+l.importo,0))}</td></tr></tfoot></table></div></div></div>`;
+  });
+  document.getElementById('storeDetailOut').innerHTML=html;
+}
+
+// ============================================================
+// ALL ORDERS
+function checkDeletePassword(){
+  const pwd=prompt('🔒 Inserisci la password per confermare la cancellazione:');
+  if(pwd!=='Donts2022'){alert('❌ Password errata. Operazione annullata.');return false;}
+  return true;
+}
+
+function deleteOrder(id){
+  const o=DB.orders.find(o=>o.id===id);
+  if(!o) return;
+  if(!checkDeletePassword()) return;
+  if(!confirm(`🗑 Vuoi eliminare l'ordine ${id} (${o.store}, ${o.data}, €${fmt(o.tot)})?\n\nQuesta azione è irreversibile.`)) return;
+  DB.orders=DB.orders.filter(o=>o.id!==id);
+  DB.anomalies=DB.anomalies.filter(a=>a.ordine!==id);
+  document.getElementById('orderDetail').innerHTML='';
+  refreshAll();renderProds();
+}
+
+function renderAllOrders(){
+  const search=(document.getElementById('searchOrd').value||'').toLowerCase();
+  const sf=document.getElementById('filterOrdStore').value;
+  const of2=document.getElementById('filterOrdOp').value;
+  const src=document.getElementById('filterOrdSource').value;
+  let filtered=DB.orders;
+  if(sf) filtered=filtered.filter(o=>o.store===sf);
+  if(of2) filtered=filtered.filter(o=>o.op===of2);
+  if(src) filtered=filtered.filter(o=>o.source===src);
+  if(search) filtered=filtered.filter(o=>o.id.includes(search)||(o.op||'').toLowerCase().includes(search));
+  // Ordina per data (dd/mm/yyyy → confronto corretto)
+  filtered.sort((a,b)=>{
+    const da=(a.data||'').split('/').reverse().join('');
+    const db=(b.data||'').split('/').reverse().join('');
+    return da.localeCompare(db);
+  });
+  const totImp=filtered.reduce((s,o)=>s+(o.imp||0),0);
+  const totIva=filtered.reduce((s,o)=>s+(o.iva_v||0),0);
+  const totTot=filtered.reduce((s,o)=>s+(o.tot||0),0);
+  document.getElementById('ordersBody').innerHTML=filtered.map(o=>`<tr>
+    <td class="fb mono" style="cursor:pointer" onclick="showOrderDetail('${o.id}')">${o.id}</td><td>${storePill(o.store)}</td><td>${o.data}</td><td>${o.cons||'—'}</td><td>${o.op}</td><td class="tc">${(o.lines||[]).length}</td>
+    <td class="tr mono">€${fmt(o.imp)}</td><td class="tr mono">€${fmt(o.iva_v)}</td><td class="tr mono fb">€${fmt(o.tot)}</td><td>${sourceBadge(o.source)}</td>
+    <td class="tc"><button onclick="event.stopPropagation();deleteOrder('${o.id}')" style="background:none;border:none;cursor:pointer;color:#c0392b;font-size:14px" title="Elimina ordine">🗑</button></td></tr>`).join('');
+  document.getElementById('ordersFoot').innerHTML=`<td class="fb">TOTALE</td><td></td><td></td><td></td><td></td><td class="tc fb">${filtered.reduce((s,o)=>s+(o.lines||[]).length,0)}</td>
+    <td class="tr fb mono">€${fmt(totImp)}</td><td class="tr fb mono">€${fmt(totIva)}</td><td class="tr fb mono">€${fmt(totTot)}</td><td></td><td></td>`;
+}
+function showOrderDetail(id){
+  const o=DB.orders.find(o=>o.id===id);if(!o) return;
+  const lines=o.lines||[];
+  document.getElementById('orderDetail').innerHTML=`<div class="card mt14"><div class="card-head green flexb"><span>📦 Dettaglio Ordine ${o.id} — ${o.store}</span><button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4)" onclick="deleteOrder('${o.id}')">🗑 Elimina</button></div>
+    <div style="padding:12px 16px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border)">Data: <strong>${o.data}</strong> · Cons: <strong>${o.cons||'N/D'}</strong> · Op: <strong>${o.op}</strong> · Imp: <strong>€${fmt(o.imp)}</strong> · IVA: <strong>€${fmt(o.iva_v)}</strong> · Tot: <strong>€${fmt(o.tot)}</strong></div>
+    <div class="scroll-x"><table class="dtable green"><thead><tr><th>#</th><th>Descrizione</th><th>UM</th><th class="tr">Qtà</th><th class="tr">Prezzo €</th><th class="tc">IVA %</th><th class="tr">Importo €</th></tr></thead>
+    <tbody>${lines.map((l,i)=>`<tr><td class="tc">${i+1}</td><td class="fb">${l.desc}</td><td class="tc">${l.um}</td><td class="tr mono">${fmtI(l.qta)}</td><td class="tr mono">€${fmt(l.prezzo)}</td><td class="tc">${l.iva}%</td><td class="tr mono fb">€${fmt(l.importo)}</td></tr>`).join('')}</tbody>
+    <tfoot><tr><td colspan="6" class="tr fb">TOTALE DOCUMENTO</td><td class="tr fb mono">€${fmt(o.tot)}</td></tr></tfoot></table></div></div>`;
+  document.getElementById('orderDetail').scrollIntoView({behavior:'smooth'});
+}
+
+// ============================================================
+// WEEKLY
+function renderWeekly(){
+  const store=document.getElementById('weekStore').value;
+  const weekIdx=document.getElementById('weekNum').value;
+  const weeks=DB.weekly[store]||[];
+  let html='';
+  const wkClasses=['wk1','wk2','wk3','wk4'];
+  weeks.forEach((w,idx)=>{
+    if(weekIdx!==''&&parseInt(weekIdx)!==idx) return;
+    const prods=w.products||[];
+    const total=prods.reduce((s,p)=>s+(p.tot||0),0);
+    html+=`<div class="wk-block ${wkClasses[idx]||'wk1'}"><div class="wk-head"><span>${w.header}</span>
+      <span style="font-size:11px">${w.orders_info?w.orders_info.substring(0,80):''} · ${prods.length} prodotti · €${fmt(total)}</span></div>
+      <div class="scroll-x"><table class="dtable"><thead><tr><th>#</th><th>Prodotto</th><th>Norm.</th><th class="tr">Qtà</th><th>UM</th><th class="tr">Pr. medio €</th><th class="tr">Tot. spesa €</th><th class="tc">Doc.</th><th>Note</th></tr></thead>
+      <tbody>${prods.map((p,i)=>{
+        const hasNote=p.note&&p.note.trim();
+        const noteStyle=hasNote&&p.note.includes('⚠')?'style="background:#fff8e1"':'';
+        return `<tr ${noteStyle}><td class="tc muted">${i+1}</td><td class="fb" style="font-size:11px">${p.desc}</td><td style="font-size:10px;color:var(--muted)">${p.norm||'—'}</td>
+          <td class="tr mono fb">${fmtI(p.qta)}</td><td class="tc">${p.um}</td><td class="tr mono">€${fmt(p.pm)}</td><td class="tr mono fb">€${fmt(p.tot)}</td><td class="tc">${p.nd}</td>
+          <td style="font-size:10px;max-width:200px">${hasNote?'<span class="abadge a-warn" style="font-size:9px">'+p.note+'</span>':''}</td></tr>`;
+      }).join('')}</tbody>
+      <tfoot><tr><td colspan="6" class="tr fb">TOTALE — ${prods.length} prodotti</td><td class="tr fb mono">€${fmt(total)}</td><td></td><td></td></tr></tfoot></table></div></div>`;
+  });
+  document.getElementById('weeklyOut').innerHTML=html||'<div class="alert alert-info">Nessun dato.</div>';
+}
+
+// ============================================================
+// ANOMALIES
+function renderAnom(){
+  const catF=document.getElementById('fAnomCat').value;
+  const certF=document.getElementById('fAnomCert').value;
+  let filtered=DB.anomalies;
+  if(catF) filtered=filtered.filter(a=>a.cat===catF);
+  if(certF) filtered=filtered.filter(a=>a.cert&&a.cert.includes(certF));
+  const cats=['PREZZO','QUANTITÀ','NOME PRODOTTO','DATI MANCANTI'];
+  let html='';
+  for(const cat of cats){
+    const items=filtered.filter(a=>a.cat===cat);
+    if(items.length===0) continue;
+    const catIcon=cat==='PREZZO'?'💰':cat==='QUANTITÀ'?'📦':cat==='NOME PRODOTTO'?'🏷️':'❓';
+    html+=`<div class="section-hd mt14">${catIcon} ${cat} (${items.length})</div>`;
+    items.forEach(a=>{
+      const detLines=(a.det||'').split('\n');
+      html+=`<div style="padding:12px 0;border-bottom:1px solid #f0f1f3"><div class="flexb"><div>${certBadge(a.cert)} <span class="fb" style="margin-left:6px">#${a.n} — ${a.tipo||a.cat}</span></div>
+        <span class="muted" style="font-size:11px">${storePill(a.store)} · ${a.ordine}</span></div><div class="anom-detail">${detLines.join('\n')}</div></div>`;
+    });
+  }
+  document.getElementById('anomBody').innerHTML=html||'<div class="alert alert-info">Nessuna anomalia.</div>';
+  document.getElementById('verifList').innerHTML=DB.verifications.map(v=>`<li>${v.replace('✅ ','').replace('• ','')}</li>`).join('');
+}
+
+// ============================================================
+// NOTE DI CREDITO
+function renderCredito(){
+  let html=`<div class="alert alert-ok" style="margin-bottom:16px">✅ <strong>ESITO:</strong> Nessuna nota di credito presente nei documenti analizzati</div>`;
+  html+='<div class="section-hd">Dettaglio verifica per blocco</div>';
+  DB.note_credito.forEach(line=>{
+    if(line.includes('NOTE DI CREDITO —')||line.includes('Verifica effettuata')||line.includes('ESITO')) return;
+    if(line.includes('SEZIONE')){html+=`<div class="section-hd mt14">${line}</div>`;return;}
+    html+=`<div class="nc-item">${line}</div>`;
+  });
+  document.getElementById('creditoBody').innerHTML=html;
+}
+
+// ============================================================
+// LISTINO CONCORDATO RENDER
+function renderListinoConcordato(){
+  const q=(document.getElementById('searchLC')||{}).value||'';
+  const ql=q.toLowerCase();
+  const fmt3=n=>n!=null?Number(n).toLocaleString('it-IT',{minimumFractionDigits:3,maximumFractionDigits:3}):'—';
+  const items=(DB.listino_concordato||[]).filter(p=>
+    !ql||p.desc.toLowerCase().includes(ql)||(p.cod||'').toLowerCase().includes(ql)
+  );
+  // Per ogni prodotto calcola scostamenti dagli ordini storici
+  const scost={};
+  (DB.orders||[]).forEach(o=>{
+    (o.lines||[]).forEach(l=>{
+      const lc=items.find(p=>p.cod===l.cod||p.desc===l.desc||(l.desc&&l.desc.startsWith(p.desc.substring(0,25))));
+      if(!lc) return;
+      const diff=l.prezzo-lc.price;
+      if(Math.abs(diff)>0.001){
+        if(!scost[lc.cod]) scost[lc.cod]=[];
+        scost[lc.cod].push({ordine:o.id,store:o.store,data:o.data,prezzo:l.prezzo,diff});
+      }
+    });
+  });
+  let rows='';
+  items.forEach(p=>{
+    const sc=scost[p.cod]||[];
+    const badge=sc.length>0
+      ?`<span class="abadge a-warn">⚠️ ${sc.length} scostamenti</span>`
+      :`<span class="abadge a-ok">✅ OK</span>`;
+    rows+=`<tr>
+      <td style="font-size:11px;color:var(--muted);white-space:nowrap">${p.cod||'—'}</td>
+      <td style="font-size:12px;font-weight:600">${p.desc}</td>
+      <td style="text-align:center">${p.um}</td>
+      <td class="tr mono" style="font-weight:700">€ ${fmt3(p.price)}</td>
+      <td style="text-align:center;color:var(--muted)">${p.iva}%</td>
+      <td style="font-size:11px">${badge}${sc.length>0?'<br><span style="font-size:10px;color:var(--muted)">'+sc.slice(0,3).map(s=>`ord.${s.ordine} ${s.store} €${s.prezzo.toFixed(3)} (${s.diff>0?'+':''}€${s.diff.toFixed(3)})`).join(' · ')+'</span>':''}</td>
+    </tr>`;
+  });
+  const tbody=document.getElementById('listinoBody');
+  if(tbody) tbody.innerHTML=rows||'<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--muted)">Nessun prodotto trovato</td></tr>';
+}
+
+// ============================================================
+// REFRESH ALL
+function refreshAll(){
+  saveDB();
+  renderDashboard();
+  renderAllOrders();
+  renderAnom();
+}
+
+// ============================================================
+// INIT
+function resetDB(){if(!confirm('⚠️ Vuoi cancellare tutti i dati e tornare ai valori iniziali?')) return;localStorage.removeItem(DB_KEY);location.reload();}
+function init(){
+  const ops=[...new Set(DB.orders.map(o=>o.op).filter(Boolean))].sort();
+  document.getElementById('filterOrdOp').innerHTML='<option value="">Tutti gli operatori</option>'+ops.map(op=>`<option>${op}</option>`).join('');
+  renderDashboard();
+  renderAllOrders();
+  renderAnom();
+  renderCredito();
+  renderListinoConcordato();
+  // Carica da Supabase (sovrascrive localStorage se ci sono dati)
+  sbLoadAll();
+}
+init();
+</script>
+</body>
+</html>

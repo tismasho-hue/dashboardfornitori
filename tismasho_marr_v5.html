@@ -1,0 +1,1234 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TISMASHO — Dashboard MARR S.p.A.</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+:root {
+  --green:#c8102e; --green-light:#fde8eb; --green-mid:#e8364f;
+  --blue:#006838; --blue-light:#e2f0e8; --blue-mid:#2d8c57;
+  --orange:#f4b942; --red:#c00000; --red-light:#ffc7ce;
+  --yellow:#fff2cc; --gray:#f4f5f7; --border:#d0d0d0;
+  --text:#1a1a1a; --muted:#6b7280; --white:#ffffff;
+  --shadow:0 1px 4px rgba(0,0,0,0.06),0 2px 12px rgba(0,0,0,0.04);
+  --radius:10px;
+  --font:'DM Sans',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);font-size:13px;background:var(--gray);color:var(--text);min-height:100vh}
+.topbar{background:linear-gradient(135deg,#c8102e 0%,#9b0d24 100%);color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 28px;height:56px;box-shadow:0 2px 12px rgba(200,16,46,.25)}
+.topbar-brand{display:flex;align-items:center;gap:14px}
+.topbar-brand h1{font-size:17px;font-weight:700;letter-spacing:-.3px}
+.topbar-brand span{font-size:11px;opacity:.7}
+.marr-logo{display:flex;align-items:center;gap:8px}
+.marr-logo-icon{width:32px;height:32px;background:#fff;border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:900;color:#c8102e;font-size:11px;letter-spacing:-.5px}
+.topbar-actions{display:flex;gap:10px;align-items:center}
+.tabs{background:var(--blue);display:flex;padding:0 28px;overflow-x:auto;gap:2px;box-shadow:0 2px 6px rgba(0,104,56,.2)}
+.tab{padding:12px 20px;color:rgba(255,255,255,.6);cursor:pointer;font-size:12px;font-weight:600;border-bottom:3px solid transparent;white-space:nowrap;transition:all .2s;letter-spacing:.2px}
+.tab:hover{color:#fff;background:rgba(255,255,255,.06)}
+.tab.active{color:#fff;border-bottom-color:var(--orange)}
+.badge{background:var(--green);color:#fff;border-radius:9px;padding:1px 6px;font-size:10px;margin-left:5px;font-weight:700}
+.page{display:none;padding:24px 28px;max-width:1440px;margin:0 auto}
+.page.active{display:block}
+.card{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:18px;overflow:hidden;border:1px solid var(--border)}
+.card-head{padding:13px 20px;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:space-between;letter-spacing:.2px;border-bottom:1px solid var(--border)}
+.card-head.blue{background:var(--blue);color:#fff;border:none}
+.card-head.green{background:var(--green);color:#fff;border:none}
+.card-head.orange{background:#c55a11;color:#fff;border:none}
+.card-head.neutral{background:#f8f9fa;color:var(--text)}
+.card-body{padding:20px}
+.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:18px}
+.stat{background:var(--white);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow);border:1px solid var(--border);border-top:3px solid var(--blue-mid);transition:transform .15s}
+.stat:hover{transform:translateY(-2px)}
+.stat.b{border-top-color:#1f4e79}.stat.o{border-top-color:var(--orange)}.stat.r{border-top-color:var(--green)}.stat.y{border-top-color:#f1c40f}
+.stat-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:700;letter-spacing:.5px;margin-bottom:6px}
+.stat-val{font-size:24px;font-weight:700;color:var(--blue);font-family:var(--mono)}
+.stat-sub{font-size:10px;color:var(--muted);margin-top:4px}
+.btn{display:inline-flex;align-items:center;gap:5px;padding:8px 16px;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:600;transition:all .15s;font-family:var(--font)}
+.btn-green{background:var(--blue);color:#fff}.btn-green:hover{background:#004d2a}
+.btn-blue{background:#1f4e79;color:#fff}.btn-blue:hover{background:#163a5c}
+.btn-orange{background:#c55a11;color:#fff}.btn-orange:hover{background:#9e4610}
+.btn-red{background:var(--green);color:#fff}.btn-red:hover{background:#9b0d24}
+.btn-ghost{background:transparent;color:var(--blue);border:1.5px solid var(--border)}.btn-ghost:hover{background:var(--blue-light)}
+.btn-sm{padding:5px 10px;font-size:11px}
+.dtable{width:100%;border-collapse:collapse;font-size:12px}
+.dtable th{background:#f8f9fa;color:var(--text);padding:10px 12px;font-size:11px;text-align:left;white-space:nowrap;border-bottom:2px solid var(--border);font-weight:700;text-transform:uppercase;letter-spacing:.3px;position:sticky;top:0;z-index:1}
+.dtable td{padding:9px 12px;border-bottom:1px solid #f0f1f3;vertical-align:middle}
+.dtable tr:hover td{background:#f8fafe}
+.dtable tfoot td{background:#f8f9fa;font-weight:700;border-top:2px solid var(--border)}
+.dtable.green th{background:var(--green);color:#fff}
+.dtable.blue th{background:var(--blue);color:#fff}
+.dtable.red th{background:var(--green);color:#fff}
+.pill{display:inline-block;padding:3px 10px;border-radius:12px;font-size:10px;font-weight:700;letter-spacing:.2px}
+.pTRASTEVERE{background:#dce6f1;color:#1f4e79}.pPIAZZA{background:#e2efda;color:#375623}.pPONTE{background:#fce4d6;color:#7b3f00}.pTUSCOLANA{background:#ede7f6;color:#4b0082}
+.alert{padding:12px 16px;border-radius:8px;margin-bottom:14px;font-size:12px;display:flex;align-items:flex-start;gap:8px;line-height:1.5}
+.alert-info{background:var(--blue-light);color:var(--blue);border:1px solid #9dcc80}
+.alert-ok{background:#e2f0e8;color:#2d5016;border:1px solid #9dcc80}
+.alert-warn{background:var(--yellow);color:#7b5c00;border:1px solid #f0d68a}
+.alert-err{background:var(--green-light);color:var(--green);border:1px solid #e8a0a0}
+.abadge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:12px;font-size:10px;font-weight:700}
+.a-certa{background:var(--green-light);color:var(--green)}.a-warn{background:var(--yellow);color:#7b5c00}.a-ok{background:#e2f0e8;color:var(--blue)}
+.tr{text-align:right}.tc{text-align:center}.fb{font-weight:700}
+.muted{color:var(--muted)}.gap8{gap:8px}
+.flex{display:flex}.flexb{display:flex;justify-content:space-between;align-items:center}
+.mt8{margin-top:8px}.mt14{margin-top:14px}.mt20{margin-top:20px}
+.scroll-x{overflow-x:auto}.scroll-y{overflow-y:auto}
+.divider{height:1px;background:var(--border);margin:16px 0}
+.section-hd{font-size:14px;font-weight:700;color:var(--blue);margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid var(--blue-light)}
+.mono{font-family:var(--mono)}
+.wk-block{margin-bottom:20px;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.wk-head{padding:10px 16px;font-weight:700;font-size:12px;display:flex;justify-content:space-between;align-items:center}
+.wk1 .wk-head{background:#dce6f1;color:#1f4e79}.wk2 .wk-head{background:#fce4d6;color:#7b3f00}.wk3 .wk-head{background:#e2efda;color:#375623}.wk4 .wk-head{background:#fff2cc;color:#7b5c00}
+.expand-btn{cursor:pointer;user-select:none}.expand-content{display:none}.expand-content.open{display:block}
+.anom-detail{background:#fafafa;border-radius:6px;padding:10px 14px;margin-top:6px;font-size:11px;line-height:1.6;white-space:pre-wrap;color:#555}
+.filter-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.filter-bar select,.filter-bar input{padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;font-family:var(--font);background:#fff}
+.filter-bar select:focus,.filter-bar input:focus{outline:none;border-color:var(--blue)}
+.dropzone{border:2.5px dashed var(--border);border-radius:var(--radius);padding:40px 20px;text-align:center;cursor:pointer;transition:all .2s;background:#fafafa}
+.dropzone:hover,.dropzone.drag{border-color:var(--blue);background:var(--blue-light)}
+.dropzone.success{border-color:var(--blue);background:var(--blue-light)}
+.dropzone.error{border-color:var(--green);background:var(--green-light)}
+.dz-icon{font-size:44px;margin-bottom:10px;display:block}
+.dz-title{font-size:15px;font-weight:700;color:var(--blue);margin-bottom:6px}
+.dz-sub{font-size:11px;color:var(--muted)}.dz-file{font-size:12px;color:var(--blue);font-weight:700;margin-top:6px}
+.prog-wrap{margin-top:14px;display:none}
+.prog-label{font-size:12px;font-weight:600;color:var(--blue);margin-bottom:5px}
+.prog-bar{height:7px;background:var(--border);border-radius:4px;overflow:hidden}
+.prog-fill{height:100%;background:linear-gradient(90deg,var(--blue),var(--blue-mid));border-radius:4px;transition:width .35s}
+.steps{display:flex;gap:0;margin-bottom:20px}
+.step{flex:1;padding:10px 16px;background:#fff;border:1.5px solid var(--border);font-size:11px;font-weight:600;color:var(--muted);display:flex;align-items:center;gap:8px;border-right:none}
+.step:last-child{border-right:1.5px solid var(--border);border-radius:0 6px 6px 0}
+.step:first-child{border-radius:6px 0 0 6px}
+.step.done{background:#e2f0e8;border-color:var(--blue-mid);color:var(--blue)}
+.step.active{background:#fde8eb;border-color:#c8102e;color:#c8102e}
+.step-num{width:22px;height:22px;border-radius:50%;background:var(--border);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.step.done .step-num{background:var(--blue)}.step.active .step-num{background:#c8102e}
+.ptable{width:100%;border-collapse:collapse;font-size:12px}
+.ptable th{background:var(--blue);color:#fff;padding:8px 10px;font-size:11px;text-align:left;white-space:nowrap}
+.ptable td{padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
+.ptable tr:nth-child(even) td{background:#fafafa}
+.ptable input{padding:4px 6px;font-size:11px;width:100%;border:1.5px solid var(--border);border-radius:4px;font-family:var(--font)}
+.frow{display:grid;gap:10px;margin-bottom:10px}
+.c2{grid-template-columns:1fr 1fr}.c3{grid-template-columns:1fr 1fr 1fr}.c4{grid-template-columns:1fr 1fr 1fr 1fr}
+label{display:block;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px}
+input,select{width:100%;padding:7px 9px;border:1.5px solid var(--border);border-radius:4px;font-size:12px;font-family:var(--font);background:#fafafa;transition:border .15s}
+input:focus,select:focus{outline:none;border-color:var(--blue);background:#fff}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;display:none;align-items:center;justify-content:center}
+.modal-bg.open{display:flex}
+.modal{background:#fff;border-radius:10px;padding:24px;max-width:560px;width:92%;box-shadow:0 8px 32px rgba(0,0,0,.22);max-height:90vh;overflow-y:auto}
+.modal h3{font-size:15px;color:var(--blue);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.modal-foot{margin-top:18px;display:flex;justify-content:flex-end;gap:10px}
+@media(max-width:1100px){.stats{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:768px){.stats{grid-template-columns:1fr 1fr}.filter-bar{flex-direction:column}.c4,.c3{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-brand">
+    <div class="marr-logo"><div class="marr-logo-icon">MARR</div></div>
+    <div>
+      <h1>TISMASHO — Dashboard MARR S.p.A.</h1>
+      <span id="topbarInfo">MARR S.p.A. (Gruppo Cremonini) · FEBBRAIO 2026 · 1 DDT · 4 store</span>
+    </div>
+  </div>
+  <div class="topbar-actions">
+    <span id="syncStatus" style="font-size:10px;display:none"></span>
+    <button class="btn btn-orange btn-sm" onclick="exportExcel()">⬇ Esporta Master Excel</button>
+    <button class="btn btn-sm" style="background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.4);font-size:11px" onclick="saveDB();alert('✅ Dati salvati!')">💾 Salva</button>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('dashboard')">📊 Dashboard</div>
+  <div class="tab" onclick="showTab('carica')">📄 Carica DDT</div>
+  <div class="tab" onclick="showTab('store')">🏪 Dettaglio Store</div>
+  <div class="tab" onclick="showTab('ordini')">📋 Tutti i DDT</div>
+  <div class="tab" onclick="showTab('settimane')">📅 Riepilogo Settimanale</div>
+  <div class="tab" onclick="showTab('anomalie')">⚠️ Anomalie <span class="badge" id="anomBadge">0</span></div>
+  <div class="tab" onclick="showTab('credito')">📝 Note di Credito</div>
+  <div class="tab" onclick="showTab('listino_concordato')">📋 Listino Concordato</div>
+  <div class="tab" onclick="showTab('listino')">⚙ Anagrafica Prodotti</div>
+</div>
+
+<!-- ===== DASHBOARD ===== -->
+<div id="page-dashboard" class="page active">
+  <div class="stats" id="statsGrid"></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
+    <div class="card"><div class="card-head green">📊 Riepilogo per Store — MARR</div>
+      <div class="scroll-x"><table class="dtable green"><thead><tr><th>Store</th><th>N° DDT</th><th class="tr">Imponibile €</th><th class="tr">IVA €</th><th class="tr">Totale €</th><th class="tr">%</th></tr></thead><tbody id="riepilogoBody"></tbody><tfoot id="riepilogoFoot"></tfoot></table></div>
+    </div>
+    <div class="card"><div class="card-head orange">⚠️ Anomalie — Sintesi</div><div class="card-body" id="dashAnom" style="max-height:320px;overflow-y:auto"></div></div>
+  </div>
+  <div class="card"><div class="card-head blue">📋 Ultimi DDT</div>
+    <div class="scroll-x" style="max-height:400px;overflow-y:auto"><table class="dtable blue"><thead><tr><th>N° DDT</th><th>Store</th><th>Data</th><th>Consegna</th><th>Righe</th><th class="tr">Imp. €</th><th class="tr">IVA €</th><th class="tr">Tot. €</th><th>Fonte</th></tr></thead><tbody id="dashOrders"></tbody></table></div>
+  </div>
+</div>
+
+<!-- ===== CARICA DDT ===== -->
+<div id="page-carica" class="page">
+  <div class="steps">
+    <div class="step active" id="st1"><div class="step-num">1</div>Carica DDT</div>
+    <div class="step" id="st2"><div class="step-num">2</div>Verifica dati</div>
+    <div class="step" id="st3"><div class="step-num">3</div>Conferma e salva</div>
+  </div>
+  <div id="step1Block">
+    <div class="card"><div class="card-head green">📁 Trascina o seleziona il DDT/Fattura MARR</div>
+      <div class="card-body">
+        <div class="alert alert-info">ℹ️ Formato supportato: <strong>DDT/FAT.CORTESIA MARR S.p.A.</strong> — layout fisso — un PDF = un DDT. Il parser legge automaticamente tutti i campi.</div>
+        <div class="dropzone" id="dz" onclick="document.getElementById('pdfInput').click()" ondragover="dzOver(event)" ondragleave="dzLeave()" ondrop="dzDrop(event)">
+          <span class="dz-icon">📄</span>
+          <div class="dz-title">Clicca qui o trascina il DDT MARR</div>
+          <div class="dz-sub">File .pdf · DDT/Fattura MARR S.p.A. · Es. 000023888_07_02_2026.pdf</div>
+          <div class="dz-file" id="dzFileName"></div>
+        </div>
+        <input type="file" id="pdfInput" accept=".pdf" style="display:none" onchange="loadPDF(event)">
+        <div class="prog-wrap" id="progWrap"><div class="prog-label" id="progLabel">Lettura DDT...</div><div class="prog-bar"><div class="prog-fill" id="progFill" style="width:0%"></div></div></div>
+        <div id="parseError"></div>
+        <div class="divider"></div>
+        <div class="flexb"><span style="font-size:11px;font-weight:700;color:var(--muted)">📦 IMPORTAZIONE MULTIPLA — Elabora più DDT in sequenza</span>
+          <button class="btn btn-ghost btn-sm" onclick="document.getElementById('pdfMulti').click()">+ Seleziona più PDF</button>
+        </div>
+        <input type="file" id="pdfMulti" accept=".pdf" multiple style="display:none" onchange="loadMulti(event)">
+        <div id="multiQueue" style="margin-top:10px"></div>
+      </div>
+    </div>
+  </div>
+  <div id="step2Block" style="display:none">
+    <div class="card"><div class="card-head blue flexb" id="step2Head">
+        <span>✅ Dati estratti — Verifica e correggi</span>
+        <button class="btn btn-ghost btn-sm" style="color:#fff;border-color:rgba(255,255,255,.5)" onclick="backToStep1()">← Carica altro</button>
+      </div>
+      <div class="card-body">
+        <div class="frow c4">
+          <div><label>N° DDT (BE)</label><input id="prev_num" type="text"></div>
+          <div><label>Store destinazione</label><select id="prev_store"><option>TUSCOLANA</option><option>TRASTEVERE</option><option>PIAZZA ISTRIA</option><option>PONTE MILVIO</option></select></div>
+          <div><label>Data Documento</label><input id="prev_data" type="text" placeholder="dd/mm/yyyy"></div>
+          <div><label>Data Consegna</label><input id="prev_cons" type="text" placeholder="dd/mm/yyyy"></div>
+        </div>
+        <div class="frow c2">
+          <div><label>Cod. Cliente</label><input id="prev_codcli" type="text"></div>
+          <div><label>Pagamento</label><input id="prev_pag" type="text"></div>
+        </div>
+        <div class="divider"></div>
+        <div class="section-hd">Righe articolo</div>
+        <div style="overflow-x:auto"><table class="ptable">
+          <thead><tr><th>#</th><th>Codice</th><th>Descrizione</th><th>Lotto</th><th>UM</th><th>Qtà</th><th>Prezzo €</th><th>IVA %</th><th>Importo €</th><th></th></tr></thead>
+          <tbody id="prevRows"></tbody>
+          <tfoot><tr><td colspan="8" style="padding:8px 10px;font-size:11px">TOTALE IMPONIBILE</td><td id="prevTotImp" style="padding:8px 10px;font-weight:700;text-align:right"></td><td></td></tr></tfoot>
+        </table></div>
+        <div class="mt8 flex gap8" style="justify-content:flex-end"><button class="btn btn-ghost btn-sm" onclick="addPrevRow()">+ Aggiungi riga</button></div>
+      </div>
+    </div>
+    <div id="anomalyCheck"></div>
+    <div class="card"><div class="card-body flexb">
+      <div id="prevTotals" style="font-size:13px"></div>
+      <div class="flex gap8"><button class="btn btn-ghost" onclick="backToStep1()">← Annulla</button><button class="btn btn-green" onclick="confirmSave()">✅ Conferma e salva</button></div>
+    </div></div>
+  </div>
+  <div id="step3Block" style="display:none">
+    <div class="card"><div class="card-head blue">🎉 DDT MARR salvato con successo</div>
+      <div class="card-body"><div id="saveConfirmMsg"></div>
+        <div class="mt14 flex gap8">
+          <button class="btn btn-red" onclick="backToStep1()">📄 Carica nuovo DDT</button>
+          <button class="btn btn-blue" onclick="exportExcel()">⬇ Esporta Master Excel</button>
+          <button class="btn btn-ghost" onclick="showTab('ordini')">📋 Vedi DDT</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== DETTAGLIO STORE ===== -->
+<div id="page-store" class="page">
+  <div class="filter-bar" style="margin-bottom:16px"><select id="storeFilter" onchange="renderStoreDetail()" style="min-width:200px">
+    <option value="TUSCOLANA">TUSCOLANA</option><option value="TRASTEVERE">TRASTEVERE</option><option value="PIAZZA ISTRIA">PIAZZA ISTRIA</option><option value="PONTE MILVIO">PONTE MILVIO</option>
+  </select></div>
+  <div id="storeDetailOut"></div>
+</div>
+
+<!-- ===== TUTTI I DDT ===== -->
+<div id="page-ordini" class="page">
+  <div class="card"><div class="card-head neutral flexb">
+    <span>📋 Storico DDT/Fatture MARR</span>
+    <div class="filter-bar">
+      <input id="searchOrd" type="text" placeholder="🔍 cerca..." style="width:160px" oninput="renderAllOrders()">
+      <select id="filterOrdStore" onchange="renderAllOrders()" style="width:150px"><option value="">Tutti gli store</option><option>TRASTEVERE</option><option>PIAZZA ISTRIA</option><option>PONTE MILVIO</option><option>TUSCOLANA</option></select>
+      <select id="filterOrdSource" onchange="renderAllOrders()" style="width:130px"><option value="">Tutte le fonti</option><option value="pdf">PDF</option><option value="storico">Storico</option></select>
+    </div>
+  </div>
+  <div class="scroll-y" style="max-height:600px"><table class="dtable red">
+    <thead><tr><th>N° DDT</th><th>Store</th><th>Data</th><th>Cons.</th><th>Righe</th><th class="tr">Imp. €</th><th class="tr">IVA €</th><th class="tr">Tot. €</th><th>Fonte</th><th></th></tr></thead>
+    <tbody id="ordersBody"></tbody>
+    <tfoot><tr id="ordersFoot"><td colspan="10"></td></tr></tfoot>
+  </table></div></div>
+  <div id="orderDetail"></div>
+</div>
+
+<!-- ===== RIEPILOGO SETTIMANALE ===== -->
+<div id="page-settimane" class="page">
+  <div class="filter-bar" style="margin-bottom:16px">
+    <select id="weekStore" onchange="renderWeekly()" style="min-width:200px"><option value="ALL">Tutti gli store</option><option value="TUSCOLANA">TUSCOLANA</option><option value="TRASTEVERE">TRASTEVERE</option><option value="PIAZZA ISTRIA">PIAZZA ISTRIA</option><option value="PONTE MILVIO">PONTE MILVIO</option></select>
+  </div>
+  <div id="weeklyOut"></div>
+</div>
+
+<!-- ===== ANOMALIE ===== -->
+<div id="page-anomalie" class="page">
+  <div class="card"><div class="card-head neutral flexb">
+    <span>⚠️ Anomalie rilevate — controllo automatico</span>
+    <div class="filter-bar">
+      <select id="fAnomCat" onchange="renderAnom()" style="min-width:140px"><option value="">Tutte</option><option>PREZZO</option><option>QUANTITÀ</option><option>NOME PRODOTTO</option><option>DATI MANCANTI</option></select>
+      <select id="fAnomCert" onchange="renderAnom()" style="min-width:140px"><option value="">Tutte</option><option value="CERTA">🔴 Certe</option><option value="DA VERIFICARE">🟡 Da verificare</option></select>
+    </div>
+  </div><div class="scroll-y" style="max-height:600px"><div id="anomBody" class="card-body"></div></div></div>
+</div>
+
+<!-- ===== NOTE DI CREDITO ===== -->
+<div id="page-credito" class="page">
+  <div class="card"><div class="card-head green">📝 Note di Credito — MARR S.p.A. — Febbraio 2026</div><div class="card-body" id="creditoBody"></div></div>
+</div>
+
+<!-- ===== LISTINO CONCORDATO ===== -->
+<div id="page-listino_concordato" class="page">
+  <div class="card">
+    <div class="card-head blue flexb">
+      <span>📋 Listino Concordato MARR — Elenco Prodotti Venduti 24/02/2026 (61 articoli)</span>
+      <input id="searchLC" type="text" placeholder="🔍 cerca..." style="width:180px;padding:5px 10px;border:1px solid rgba(255,255,255,.3);border-radius:5px;background:rgba(255,255,255,.15);color:#fff;font-size:12px" oninput="renderListinoConcordato()">
+    </div>
+    <div class="scroll-y" style="max-height:580px">
+      <table class="dtable blue">
+        <thead><tr><th>Codice</th><th>Descrizione</th><th>UM</th><th class="tr">Prezzo €</th><th class="tr">Qtà Rif.</th><th class="tr">Totale €</th><th>Ultimo Ord.</th></tr></thead>
+        <tbody id="listinoBody"></tbody>
+        <tfoot><tr id="listinoFoot" style="font-weight:700;background:var(--bg)"><td colspan="7"></td></tr></tfoot>
+      </table>
+    </div>
+    <div class="card-body" style="border-top:1px solid var(--border);padding:10px 18px">
+      <span class="muted" style="font-size:11px">💡 Prezzi di riferimento concordati. Qualsiasi DDT con prezzo superiore al concordato viene segnalato come <strong>anomalia PREZZO</strong>.</span>
+    </div>
+  </div>
+</div>
+
+<!-- ===== LISTINO ===== -->
+<div id="page-listino" class="page">
+  <div class="card"><div class="card-head neutral flexb">
+    <span>🗂 Anagrafica Prodotti MARR — storico prezzi da DDT</span>
+    <button class="btn btn-green btn-sm" onclick="openProdModal()">+ Nuovo prodotto</button>
+  </div>
+  <div class="scroll-y" style="max-height:520px"><table class="dtable"><thead><tr><th>#</th><th>Codice</th><th>Descrizione</th><th>UM</th><th class="tr">Prezzo €</th><th>IVA %</th><th></th></tr></thead><tbody id="prodBody"></tbody></table></div>
+  <div class="card-body" style="border-top:1px solid var(--border);padding:10px 18px"><span class="muted" style="font-size:11px">💡 Anagrafica aggiornata automaticamente ad ogni DDT importato. Il prezzo di riferimento per le anomalie è il <strong>Listino Concordato</strong>.</span></div></div>
+</div>
+
+<!-- MODAL prodotto -->
+<div class="modal-bg" id="prodModal"><div class="modal">
+  <h3>➕ Aggiungi/modifica prodotto MARR</h3>
+  <input type="hidden" id="mp_idx">
+  <div class="frow c2">
+    <div style="grid-column:1/-1"><label>Codice articolo MARR</label><input id="mp_cod" placeholder="es. 640157"></div>
+    <div style="grid-column:1/-1"><label>Descrizione *</label><input id="mp_desc" placeholder="es. PATATE REALLY CRUNC6X6 LWF900S"></div>
+    <div><label>UM</label><select id="mp_um"><option>KG</option><option>N.</option><option>PZ</option><option>CT</option><option>LT</option></select></div>
+    <div><label>Prezzo €</label><input id="mp_price" type="number" step="0.01" placeholder="0.00"></div>
+    <div><label>IVA %</label><select id="mp_iva"><option>10</option><option>5</option><option>4</option><option>22</option></select></div>
+  </div>
+  <div class="modal-foot"><button class="btn btn-ghost" onclick="closeProdModal()">Annulla</button><button class="btn btn-green" onclick="saveProd()">Salva</button></div>
+</div></div>
+
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// DATABASE — Supabase + localStorage fallback
+const SUPABASE_URL = 'https://fkivfnpmwvponqbwxoad.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_YqS6Zcs4QP-4cdYviUX1fQ_F-qnj3ki';
+const SB = (path, opts={}) => fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+  ...opts,
+  headers: {'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json','Prefer':opts.prefer||'return=representation',...(opts.headers||{})}
+});
+
+const DB_KEY = 'tismasho_marr_db';
+const DB_DEFAULT = {
+  orders: [{"id": "BE023888", "store": "TUSCOLANA", "data": "07/02/2026", "cons": "07/02/2026", "op": "", "imp": 290.18, "iva_v": 28.54, "tot": 318.72, "source": "pdf", "pagamento": "RIM.DIRETTA 30 GG FINE MESE", "lines": [{"codice": "640157", "desc": "PATATE REALLY CRUNC6X6 LWF900S", "lotto": "21964978", "um": "KG", "qta": 80.0, "prezzo": 2.0, "prezzo_netto": 2.0, "importo": 160.0, "iva": 10}, {"codice": "607165", "desc": "PATATE LW SWEET POT.FR.LWF20 S", "lotto": "22076116", "um": "KG", "qta": 10.0, "prezzo": 4.49, "prezzo_netto": 4.49, "importo": 44.9, "iva": 10}, {"codice": "632223", "desc": "BACON FRESCO AFFETTATO1kg(MAP)", "lotto": "22059900", "um": "N.", "qta": 8.0, "prezzo": 9.46, "prezzo_netto": 9.46, "importo": 75.68, "iva": 10}, {"codice": "628838", "desc": "GUANTI NITR.NERI REF78 M 100PZ", "lotto": "22004998", "um": "N.", "qta": 2.0, "prezzo": 4.8, "prezzo_netto": 4.8, "importo": 9.6, "iva": 5}]}],
+  riepilogo: [],
+  anomalies: [],
+  note_credito: [
+    "NOTE DI CREDITO — TISMASHO SRL — FEBBRAIO 2026 — MARR S.p.A.",
+    "Verifica effettuata su tutti i documenti sorgente (DDT BE023888 del 07/02/2026)",
+    "✅  ESITO VERIFICA: Nessuna nota di credito presente nei documenti analizzati",
+    "DETTAGLIO VERIFICA PER BLOCCO",
+    "DDT BE023888 (07/02/2026) — TUSCOLANA | • Nessuna nota di credito rilevata. Documento di sola vendita, nessun valore negativo presente.",
+    "Valori negativi | • Nessun valore negativo rilevato (4 righe prodotto verificate).",
+    "SEZIONE: FATTURE / NOTE DI CREDITO DA VERIFICARE",
+    "Nessun documento da segnalare in questa sezione. Tutti i DDT sono stati correttamente identificati e assegnati ai rispettivi store."
+  ],
+  products: [
+    {"cod":"640157","desc":"PATATE REALLY CRUNC6X6 LWF900S","um":"KG","price":2.00,"iva":10},
+    {"cod":"607165","desc":"PATATE LW SWEET POT.FR.LWF20 S","um":"KG","price":4.49,"iva":10},
+    {"cod":"632223","desc":"BACON FRESCO AFFETTATO1kg(MAP)","um":"N.","price":9.46,"iva":10},
+    {"cod":"628838","desc":"GUANTI NITR.NERI REF78 M 100PZ","um":"N.","price":4.80,"iva":5}
+  ],
+  listino_concordato: [{"cod": "032878", "desc": "AGLIO GRANULI V.500 CC 250 g", "um": "N.", "price": 8.5, "qta": 2, "tot": 17.0, "ultimo_ord": "28/08/2025"}, {"cod": "624613", "desc": "AGLIO IN POLVERE SPEZIALE 250g", "um": "N.", "price": 6.9, "qta": 2, "tot": 13.8, "ultimo_ord": "29/08/2025"}, {"cod": "047046", "desc": "ALI POLLO ARROSTO 1 kg IQF", "um": "KG", "price": 5.78, "qta": 8, "tot": 46.24, "ultimo_ord": "12/02/2026"}, {"cod": "638512", "desc": "ANELLI CIPOLLA LW CROCC1kgOR4S", "um": "KG", "price": 4.9, "qta": 6, "tot": 29.4, "ultimo_ord": "25/11/2025"}, {"cod": "043833", "desc": "ANELLI CIPOLLA LW PAST1kgOR1AS", "um": "KG", "price": 6.5, "qta": 6, "tot": 39.0, "ultimo_ord": "13/02/2026"}, {"cod": "632223", "desc": "BACON FRESCO AFFETTATO1kg(MAP)", "um": "N.", "price": 9.46, "qta": 16, "tot": 151.36, "ultimo_ord": "22/02/2026"}, {"cod": "639104", "desc": "BOBINA EVERYDAY MICR.RIC800STR", "um": "N.", "price": 4.2, "qta": 4, "tot": 16.8, "ultimo_ord": "26/01/2025"}, {"cod": "632980", "desc": "BURGER VEG.RAW NOBEEF 113gX20S", "um": "N.", "price": 42.5, "qta": 1, "tot": 42.5, "ultimo_ord": "13/08/2025"}, {"cod": "000824", "desc": "BURRO 1 kg", "um": "KG", "price": 7.78, "qta": 2, "tot": 15.56, "ultimo_ord": "22/02/2026"}, {"cod": "051417", "desc": "CANDEGGINA CLASSICA SCALA 2,5L", "um": "N.", "price": 1.3, "qta": 6, "tot": 7.8, "ultimo_ord": "22/02/2026"}, {"cod": "040594", "desc": "CARTA FORNO AST.C/SEGH.360H50m", "um": "N.", "price": 7.06, "qta": 1, "tot": 7.06, "ultimo_ord": "14/01/2026"}, {"cod": "639105", "desc": "CARTA IG.EVERYDAY 2V 10 ROTOLI", "um": "N.", "price": 2.3, "qta": 12, "tot": 27.6, "ultimo_ord": "14/08/2025"}, {"cod": "605037", "desc": "CHEDDAR FETTE 176 PZ 2165 g", "um": "N.", "price": 20.6, "qta": 6, "tot": 123.6, "ultimo_ord": "19/01/2026"}, {"cod": "048957", "desc": "CIF SGRASSATORE CUCINA 750 ml", "um": "N.", "price": 4.26, "qta": 6, "tot": 25.56, "ultimo_ord": "04/11/2025"}, {"cod": "633036", "desc": "CUCINARTE MEZZE MANICHE 3 kg", "um": "KG", "price": 1.47, "qta": 12, "tot": 17.64, "ultimo_ord": "15/02/2026"}, {"cod": "638979", "desc": "DRAGO ANTICALCARE 500 ml", "um": "N.", "price": 2.5, "qta": 1, "tot": 2.5, "ultimo_ord": "17/12/2025"}, {"cod": "059145", "desc": "EDAMER TED. FETTE 1000 g", "um": "N.", "price": 8.95, "qta": 2, "tot": 17.9, "ultimo_ord": "22/02/2026"}, {"cod": "046056", "desc": "FIOR DI SALE FINO 12X1 kg", "um": "N.", "price": 3.4, "qta": 1, "tot": 3.4, "ultimo_ord": "30/01/2026"}, {"cod": "003593", "desc": "FORM.GRATT.MIX FRESCO 1kg(ATM)", "um": "KG", "price": 8.1, "qta": 2, "tot": 16.2, "ultimo_ord": "22/02/2026"}, {"cod": "046010", "desc": "FORNI & GRILL LIQUIDO MARR 5kg", "um": "N.", "price": 6.96, "qta": 2, "tot": 13.92, "ultimo_ord": "08/01/2026"}, {"cod": "631519", "desc": "GEL IGIENIZ.MANI MARR 5 L", "um": "N.", "price": 28.5, "qta": 1, "tot": 28.5, "ultimo_ord": "28/08/2025"}, {"cod": "628839", "desc": "GUANTI NITR.NERI REF78 L 100PZ", "um": "N.", "price": 4.33, "qta": 2, "tot": 8.66, "ultimo_ord": "22/02/2026"}, {"cod": "628838", "desc": "GUANTI NITR.NERI REF78 M 100PZ", "um": "N.", "price": 4.8, "qta": 1, "tot": 4.8, "ultimo_ord": "11/01/2026"}, {"cod": "631797", "desc": "GUANTI NITRILE REFLE72 L 100PZ", "um": "N.", "price": 5.67, "qta": 2, "tot": 11.34, "ultimo_ord": "19/06/2025"}, {"cod": "603878", "desc": "KETCHUP DEVELEY 15mlX100PZ", "um": "N.", "price": 5.5, "qta": 1, "tot": 5.5, "ultimo_ord": "23/01/2026"}, {"cod": "003781", "desc": "LATTE INTERO UHT BRIK 1 L", "um": "N.", "price": 1.19, "qta": 12, "tot": 14.28, "ultimo_ord": "13/02/2026"}, {"cod": "628617", "desc": "MAIONESE O.G. DEVELEY 15mlX100", "um": "N.", "price": 5.3, "qta": 1, "tot": 5.3, "ultimo_ord": "23/01/2026"}, {"cod": "031961", "desc": "MEXICO WINGS POLLO 2,5kgTR IQF", "um": "KG", "price": 5.78, "qta": 5, "tot": 28.9, "ultimo_ord": "20/02/2026"}, {"cod": "045591", "desc": "MIELE ACACIA PIANAMIELE 500 g", "um": "N.", "price": 7.5, "qta": 24, "tot": 180.0, "ultimo_ord": "10/02/2026"}, {"cod": "626771", "desc": "MIELE MILLEFIORI SQUEEZER 380g", "um": "N.", "price": 2.9, "qta": 1, "tot": 2.9, "ultimo_ord": "18/02/2026"}, {"cod": "001159", "desc": "MOZZ.GRANAROLO PIZZERIA 1 kg", "um": "KG", "price": 6.9, "qta": 1, "tot": 6.9, "ultimo_ord": "25/11/2025"}, {"cod": "613605", "desc": "NUTELLA 3 kg", "um": "N.", "price": 22.9, "qta": 1, "tot": 22.9, "ultimo_ord": "20/02/2026"}, {"cod": "619373", "desc": "OLIO GIRAS.A.OLEICO DESANTI10L", "um": "LT", "price": 2.2, "qta": 40, "tot": 88.0, "ultimo_ord": "02/01/2026"}, {"cod": "001537", "desc": "ORIGANO FOGLIE 1 kg", "um": "N.", "price": 11.9, "qta": 1, "tot": 11.9, "ultimo_ord": "31/10/2025"}, {"cod": "603229", "desc": "PAPRICA FORTE V.500 CC 250 g", "um": "N.", "price": 4.92, "qta": 15, "tot": 73.8, "ultimo_ord": "31/10/2025"}, {"cod": "045995", "desc": "PASSATA POMOD.JOLLY SQUARE 1kg", "um": "N.", "price": 1.39, "qta": 12, "tot": 16.68, "ultimo_ord": "08/01/2026"}, {"cod": "638367", "desc": "PATATE LW CRUNC.C/B9X9 LWF902S", "um": "KG", "price": 2.0, "qta": 100, "tot": 200.0, "ultimo_ord": "09/11/2025"}, {"cod": "607165", "desc": "PATATE LW SWEET POT.FR.LWF20 S", "um": "KG", "price": 4.49, "qta": 20, "tot": 89.8, "ultimo_ord": "22/02/2026"}, {"cod": "633582", "desc": "PATATE MC SURECRISP 6/6 2,5kgS", "um": "KG", "price": 2.0, "qta": 150, "tot": 300.0, "ultimo_ord": "17/02/2025"}, {"cod": "640157", "desc": "PATATE REALLY CRUNC6X6 LWF900S", "um": "KG", "price": 2.0, "qta": 160, "tot": 320.0, "ultimo_ord": "22/02/2026"}, {"cod": "001794", "desc": "PELLICOLA TRASP. AST. 300 m", "um": "N.", "price": 7.6, "qta": 1, "tot": 7.6, "ultimo_ord": "20/02/2026"}, {"cod": "641878", "desc": "PEPE NERO MACINATO CABER 1 kg", "um": "N.", "price": 19.5, "qta": 5, "tot": 97.5, "ultimo_ord": "31/10/2025"}, {"cod": "032983", "desc": "PEPERONCINO FRANTUMATO 1 kg", "um": "N.", "price": 10.9, "qta": 5, "tot": 54.5, "ultimo_ord": "31/10/2025"}, {"cod": "033545", "desc": "PIATTI CONCENTRATO MARR 5 kg", "um": "N.", "price": 4.45, "qta": 1, "tot": 4.45, "ultimo_ord": "18/02/2026"}, {"cod": "088240", "desc": "POLPO 1000/2000 g VASSOIO C", "um": "KG", "price": 14.89, "qta": 1.22, "tot": 18.17, "ultimo_ord": "13/01/2026"}, {"cod": "058413", "desc": "PROVOLA AFFUMICATA LATBRI 1 kg", "um": "N.", "price": 7.95, "qta": 1, "tot": 7.95, "ultimo_ord": "04/02/2025"}, {"cod": "031128", "desc": "RICAMBIO MOP SINTETICO", "um": "N.", "price": 1.45, "qta": 2, "tot": 2.9, "ultimo_ord": "08/08/2025"}, {"cod": "001793", "desc": "ROTOLO ALLUMINIO H.292mm 1,1kg", "um": "N.", "price": 10.35, "qta": 2, "tot": 20.7, "ultimo_ord": "19/11/2025"}, {"cod": "643720", "desc": "SACCHI NEUTRI 90X120 ROTOL10PZ", "um": "N.", "price": 2.8, "qta": 10, "tot": 28.0, "ultimo_ord": "15/02/2026"}, {"cod": "631514", "desc": "SAPONE LIQ.MANI DAILY 1 L", "um": "N.", "price": 1.9, "qta": 1, "tot": 1.9, "ultimo_ord": "22/10/2025"}, {"cod": "041685", "desc": "SCIROPPO GLUCOSIO 750 g", "um": "N.", "price": 2.99, "qta": 1, "tot": 2.99, "ultimo_ord": "11/12/2025"}, {"cod": "633527", "desc": "SGRASSATORE CHANTECLAIR 600 ml", "um": "N.", "price": 2.8, "qta": 4, "tot": 11.2, "ultimo_ord": "22/02/2026"}, {"cod": "601567", "desc": "SPUGNA ACCIAIO ARIX 30g X 25PZ", "um": "N.", "price": 8.6, "qta": 1, "tot": 8.6, "ultimo_ord": "15/01/2026"}, {"cod": "902218", "desc": "SPUGNA ASTREE 54 ACCOPPIAT10PZ", "um": "N.", "price": 3.4, "qta": 1, "tot": 3.4, "ultimo_ord": "03/02/2026"}, {"cod": "001292", "desc": "SUCCO LIMONE 100% BOTT. 1 L", "um": "N.", "price": 2.5, "qta": 6, "tot": 15.0, "ultimo_ord": "31/10/2025"}, {"cod": "004496", "desc": "SUMMIT PIATTI LUGHESINA 4 L", "um": "N.", "price": 3.3, "qta": 3, "tot": 9.9, "ultimo_ord": "11/01/2026"}, {"cod": "604617", "desc": "TOV.INFIORE 25X25 2V NERO100PZ", "um": "N.", "price": 1.82, "qta": 30, "tot": 54.6, "ultimo_ord": "22/02/2026"}, {"cod": "606260", "desc": "TOV.TISSU' 38X38 2V NERO 40 PZ", "um": "N.", "price": 1.22, "qta": 36, "tot": 43.92, "ultimo_ord": "26/01/2026"}, {"cod": "903713", "desc": "UOVA P.GIALLA M MEDIE SFUSEX90", "um": "N.", "price": 17.1, "qta": 1, "tot": 17.1, "ultimo_ord": "22/02/2026"}, {"cod": "619690", "desc": "WAFFEL COTTO AL BURRO 72X55g S", "um": "N.", "price": 38.0, "qta": 1, "tot": 38.0, "ultimo_ord": "27/12/2025"}, {"cod": "000937", "desc": "ZUCCHERO SEMOLATO PACCO 1 kg", "um": "KG", "price": 1.4, "qta": 10, "tot": 14.0, "ultimo_ord": "12/10/2025"}]
+};
+function loadDBLocal(){try{const s=localStorage.getItem(DB_KEY);if(s){const d=JSON.parse(s);if(d.orders){if(!d.note_credito)d.note_credito=DB_DEFAULT.note_credito;if(!d.listino_concordato||!d.listino_concordato.length)d.listino_concordato=DB_DEFAULT.listino_concordato;return d;}}}catch(e){} return JSON.parse(JSON.stringify(DB_DEFAULT));}
+function saveDBLocal(){try{localStorage.setItem(DB_KEY,JSON.stringify(DB));}catch(e){}}
+
+const DB = loadDBLocal();
+
+// Supabase sync functions
+async function sbLoadAll(){
+  try{
+    const [ordR,anomR,prodR] = await Promise.all([
+      SB('marr_orders?select=*&order=data.asc').then(r=>r.json()),
+      SB('marr_anomalies?select=*&order=id.asc').then(r=>r.json()),
+      SB('marr_products?select=*&order=id.asc').then(r=>r.json())
+    ]);
+    if(Array.isArray(ordR)&&ordR.length>0){
+      DB.orders=ordR.map(o=>({...o,lines:typeof o.lines==='string'?JSON.parse(o.lines):o.lines||[]}));
+      DB.anomalies=Array.isArray(anomR)?anomR.map(a=>({n:a.id,cat:a.cat,tipo:a.tipo,cert:a.cert,store:a.store,ordine:a.ordine,det:a.det})):[];
+      DB.products=Array.isArray(prodR)?prodR.map(p=>({cod:p.cod,desc:p.descr,um:p.um,price:Number(p.price),iva:p.iva,updated:p.updated})):[];
+      saveDBLocal();
+      refreshAll();renderProds();
+      showStatus('✅ Dati caricati da Supabase','ok');
+    } else if(Array.isArray(ordR)&&ordR.length===0){
+      showStatus('☁️ Database Supabase vuoto — usa i dati locali','info');
+    }
+  }catch(e){
+    console.warn('Supabase load failed, using localStorage',e);
+    showStatus('⚠️ Offline — uso dati locali','warn');
+  }
+}
+
+async function sbSaveOrder(ord){
+  try{
+    const row={id:ord.id,store:ord.store,data:ord.data,cons:ord.cons,op:ord.op||'',imp:ord.imp,iva_v:ord.iva_v,tot:ord.tot,source:ord.source||'pdf',pagamento:ord.pagamento||'',lines:JSON.stringify(ord.lines||[])};
+    await SB('marr_orders',{method:'POST',body:JSON.stringify(row),prefer:'return=representation,resolution=merge-duplicates',headers:{'Prefer':'return=representation,resolution=merge-duplicates'}});
+  }catch(e){console.warn('sbSaveOrder failed',e);}
+}
+
+async function sbSaveAnomaly(anom){
+  try{
+    const row={cat:anom.cat,tipo:anom.tipo,cert:anom.cert,store:anom.store,ordine:anom.ordine,det:anom.det};
+    await SB('marr_anomalies',{method:'POST',body:JSON.stringify(row)});
+  }catch(e){console.warn('sbSaveAnomaly failed',e);}
+}
+
+async function sbSaveProduct(prod){
+  try{
+    const row={cod:prod.cod,descr:prod.desc,um:prod.um,price:prod.price,iva:prod.iva,updated:prod.updated||''};
+    // Upsert: se cod esiste aggiorna, altrimenti inserisce
+    const existing = await SB(`marr_products?cod=eq.${encodeURIComponent(prod.cod)}&select=id`).then(r=>r.json());
+    if(Array.isArray(existing)&&existing.length>0){
+      await SB(`marr_products?id=eq.${existing[0].id}`,{method:'PATCH',body:JSON.stringify(row)});
+    } else {
+      await SB('marr_products',{method:'POST',body:JSON.stringify(row)});
+    }
+  }catch(e){console.warn('sbSaveProduct failed',e);}
+}
+
+async function sbDeleteOrder(id){
+  try{
+    await SB(`marr_orders?id=eq.${encodeURIComponent(id)}`,{method:'DELETE'});
+    await SB(`marr_anomalies?ordine=eq.${encodeURIComponent(id)}`,{method:'DELETE'});
+  }catch(e){console.warn('sbDeleteOrder failed',e);}
+}
+
+async function sbSyncAll(){
+  showStatus('☁️ Salvataggio su Supabase...','info');
+  try{
+    // Clear remote orders and re-insert all (ensures deletions propagate)
+    await SB('marr_orders?id=neq.',{method:'DELETE'});
+    for(const o of DB.orders) await sbSaveOrder(o);
+    // Sync anomalies: clear and re-insert
+    await SB('marr_anomalies?id=gt.0',{method:'DELETE'});
+    for(const a of DB.anomalies) await sbSaveAnomaly(a);
+    // Sync products
+    for(const p of DB.products) await sbSaveProduct(p);
+    showStatus('✅ Salvato su Supabase','ok');
+  }catch(e){
+    console.warn('sbSyncAll failed',e);
+    showStatus('⚠️ Errore salvataggio Supabase — dati salvati localmente','warn');
+  }
+}
+
+function showStatus(msg,type){
+  const el=document.getElementById('syncStatus');
+  if(!el) return;
+  el.textContent=msg;
+  el.style.display='inline-block';
+  el.style.color=type==='ok'?'#a5d6a7':type==='warn'?'#ffe082':'#b3e5fc';
+  setTimeout(()=>{el.style.display='none'},4000);
+}
+
+function saveDB(){
+  saveDBLocal();
+  sbSyncAll();
+}
+let currentParsed = null;
+let multiQueue = [];
+
+// UTILITY
+const fmt = v => (v||0).toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtI = v => (v||0).toLocaleString('it-IT');
+function esc(s){ return (s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+function storePill(s) {
+  const cls = s.includes('TRAST') ? 'pTRASTEVERE' : s.includes('PIAZZA') ? 'pPIAZZA' : s.includes('PONTE') ? 'pPONTE' : 'pTUSCOLANA';
+  return `<span class="pill ${cls}">${s}</span>`;
+}
+function pillClass(store){
+  if(!store) return 'TUSCOLANA';
+  if(store.includes('TRASTEVERE')) return 'TRASTEVERE';
+  if(store.includes('PIAZZA')) return 'PIAZZA';
+  if(store.includes('PONTE')) return 'PONTE';
+  return 'TUSCOLANA';
+}
+function certBadge(c) {
+  if((c||'').includes('CERTA')) return '<span class="abadge a-certa">🔴 CERTA</span>';
+  return '<span class="abadge a-warn">🟡 DA VERIFICARE</span>';
+}
+function sourceBadge(s){ return s==='pdf'?'<span class="abadge" style="background:#fde8eb;color:#c8102e">📄 PDF</span>':'<span class="abadge" style="background:#f0f0f0;color:#666">📦 storico</span>'; }
+
+// PARSERS
+function parseIT(s){return parseFloat((s||'0').replace(/\./g,'').replace(',','.'));}
+function normDate(d){
+  if(!d) return '';
+  const p=d.split('/');
+  if(p.length===3&&p[2].length===2) p[2]='20'+p[2];
+  return p.join('/');
+}
+function normalizeStore(raw){
+  if(!raw) return '';
+  const u=raw.toUpperCase();
+  if(u.includes('PONTE MILVIO')) return 'PONTE MILVIO';
+  if(u.includes('PIAZZA ISTRIA')||u.includes('ISTRIA')) return 'PIAZZA ISTRIA';
+  if(u.includes('SAN COSIMATO')||u.includes('TRASTEVERE')) return 'TRASTEVERE';
+  if(u.includes('TUSCOLANA')) return 'TUSCOLANA';
+  return raw.trim();
+}
+
+function parseMARR(text){
+  const allLines=text.split('\n');
+  const ne=allLines.map(l=>l.trim()).filter(Boolean);
+
+  // === Funzioni helper ===
+  function neFind(pred,from=0){for(let i=from;i<ne.length;i++) if(pred(ne[i])) return i; return -1;}
+
+  // === N° documento: cerca BE + cifre ===
+  const beIdx=neFind(v=>/^BE\d{5,7}$/.test(v));
+  const ordNum=beIdx>=0?ne[beIdx]:'';
+
+  // === Data documento: dd/mm/yy vicino a BE ===
+  let dataOrd='';
+  if(beIdx>=0){
+    for(let j=beIdx+1;j<Math.min(beIdx+8,ne.length);j++){
+      if(/^\d{2}\/\d{2}\/\d{2,4}$/.test(ne[j])){dataOrd=normDate(ne[j]);break;}
+    }
+  }
+
+  // === Data consegna (pagina 2) ===
+  let dataCons=dataOrd;
+  const consIdx=neFind(v=>v.includes('Data e Ora consegna'));
+  if(consIdx>=0){
+    for(let j=consIdx;j<Math.min(consIdx+3,ne.length);j++){
+      const m=ne[j].match(/(\d{2}\/\d{2}\/\d{4})/);
+      if(m){dataCons=m[1];break;}
+    }
+  }
+
+  // === Store: cerca "DONTS" ===
+  let store='';
+  const dontsIdx=neFind(v=>v.startsWith('DONTS'));
+  if(dontsIdx>=0){
+    const storeRaw=ne[dontsIdx].replace('DONTS','').trim();
+    if(storeRaw.length>=3) store=normalizeStore(storeRaw);
+    // Se "DONTS" è da solo, lo store potrebbe essere nella riga dopo combinato con altro
+    // oppure cerchiamo nelle righe vicine per parole chiave
+    if(!store){
+      for(let j=dontsIdx+1;j<Math.min(dontsIdx+5,ne.length);j++){
+        for(const kw of ['TUSCOLANA','PONTE MILVIO','PIAZZA ISTRIA','ISTRIA','TRASTEVERE','SAN COSIMATO','BELSIANA']){
+          if(ne[j].toUpperCase().includes(kw)){store=normalizeStore(kw);break;}
+        }
+        if(store) break;
+      }
+    }
+    // Fallback: cerca indirizzo noto
+    if(!store){
+      const addrBlock=ne.slice(dontsIdx,Math.min(dontsIdx+10,ne.length)).join(' ').toUpperCase();
+      if(addrBlock.includes('TUSCOLANA')) store='TUSCOLANA';
+      else if(addrBlock.includes('SAN COSIMATO')||addrBlock.includes('TRASTEVERE')) store='TRASTEVERE';
+      else if(addrBlock.includes('PIAZZA ISTRIA')||addrBlock.includes('ISTRIA')||addrBlock.includes('NOMENTANA')) store='PIAZZA ISTRIA';
+      else if(addrBlock.includes('PONTE MILVIO')||addrBlock.includes('FLAMINIA')) store='PONTE MILVIO';
+    }
+  }
+
+  // === Pagamento ===
+  const pagIdx=neFind(v=>v.startsWith('RIM.DIRETTA')||v.startsWith('RICEVUTA BANCARIA'));
+  const pagamento=pagIdx>=0?ne[pagIdx]:'';
+
+  // === Cod.Cliente ===
+  let codCliente='';
+  const codCliIdx=neFind(v=>v==='COD.CLIENTE');
+  if(codCliIdx>=0){
+    // Cerchiamo 8 cifre nelle vicinanze — ma nel formato pdf.js potrebbe essere lontano
+    // Usiamo il blocco vicino a DONTS
+    if(dontsIdx>=0){
+      for(let j=dontsIdx+1;j<Math.min(dontsIdx+5,ne.length);j++){
+        if(/^\d{7,8}$/.test(ne[j])){codCliente=ne[j];break;}
+      }
+    }
+  }
+
+  // === ARTICOLI: il cuore del parser ===
+  // Cerchiamo codici articolo MARR (6 cifre) che appaiono DOPO le filiali e prima di "Contributo ambientale"
+  // Il pattern per ogni articolo è:
+  //   codice(6cif) → desc(1+ righe) → lotto(8cif) → nConf(N,N) → UM → qty(N,NN) → prezzo(N,NN) → importo(N,NN) → iva(intero)
+
+  // Trova il range dove cercare gli articoli
+  const artStart=neFind(v=>/^(Rif\. ns\.|ORDINE MARR)/.test(v)); // subito dopo i riferimenti ordine
+  const artEnd=neFind(v=>v.startsWith('Contributo ambientale'),artStart>0?artStart:100);
+
+  const items=[];
+
+  // Cerca tutti i codici a 6 cifre nel range articoli
+  const codPositions=[];
+  const searchFrom=artStart>0?artStart:100;
+  const searchTo=artEnd>0?artEnd:ne.length-50;
+  for(let i=searchFrom;i<searchTo;i++){
+    if(/^\d{6}$/.test(ne[i])) codPositions.push(i);
+  }
+
+  console.log('[MARR] artStart=',artStart,'artEnd=',artEnd,'codPositions=',codPositions);
+
+  for(let c=0;c<codPositions.length;c++){
+    const ci=codPositions[c];
+    const codice=ne[ci];
+    // Fine di questo articolo = inizio del prossimo codice, o artEnd
+    const nextBound=(c+1<codPositions.length)?codPositions[c+1]:(artEnd>0?artEnd:ci+20);
+
+    // Leggi tutte le righe tra codice e il prossimo boundary
+    const chunk=[];
+    for(let j=ci+1;j<nextBound;j++) chunk.push(ne[j]);
+
+    console.log(`[MARR art] codice=${codice} chunk=`,chunk);
+
+    // Trova il lotto (8 cifre) nel chunk
+    let lottoIdx=-1;
+    for(let j=0;j<chunk.length;j++){
+      if(/^\d{8}$/.test(chunk[j])){lottoIdx=j;break;}
+    }
+
+    if(lottoIdx<0){
+      console.log('  → skip: nessun lotto trovato');
+      continue;
+    }
+
+    // Descrizione = tutto prima del lotto, unito
+    const desc=chunk.slice(0,lottoIdx).join(' ').trim();
+    const lotto=chunk[lottoIdx];
+
+    // Dopo il lotto: nConf, UM, qty, prezzo, importo, iva
+    const afterLotto=chunk.slice(lottoIdx+1);
+    console.log('  desc=',desc,'lotto=',lotto,'afterLotto=',afterLotto);
+
+    // Estrai numeri e UM dal blocco dopo il lotto
+    const nums=[];
+    let um='KG';
+    for(const tok of afterLotto){
+      const t=tok.replace('.','').trim();
+      if(/^(KG|N|PZ|CT|LT|BT|CF|SC)\.?$/.test(t)){um=t.replace('.','');if(um==='N')um='N.';continue;}
+      if(/^\d+[\d.,]*$/.test(t)){nums.push(parseIT(t));continue;}
+    }
+
+    console.log('  um=',um,'nums=',nums);
+
+    // nums dovrebbe essere: [nConf, qty, prezzo, importo, iva]
+    // oppure per il primo articolo del PDF: [nConf, qty, prezzo, importo, iva]
+    let nConf=0, qta=0, prezzo=0, importo=0, iva=10;
+    if(nums.length>=5){
+      nConf=nums[0]; qta=nums[1]; prezzo=nums[2]; importo=nums[3]; iva=Math.round(nums[4]);
+    } else if(nums.length>=4){
+      nConf=nums[0]; qta=nums[1]; prezzo=nums[2]; importo=nums[3];
+    } else if(nums.length>=3){
+      nConf=nums[0]; qta=nums[1]; prezzo=nums[2];
+      importo=Math.round(qta*prezzo*100)/100;
+    }
+
+    if(!desc || desc.length<3){console.log('  → skip: desc vuota'); continue;}
+
+    items.push({codice, desc, lotto, um, qta, prezzo, prezzo_netto:prezzo, importo, iva});
+    console.log('  → ✅ ARTICOLO:', {codice,desc,qta,prezzo,importo,iva});
+  }
+
+  // === Totali ===
+  let totImp=0, totIva=0, totDoc=0;
+
+  // Cerca i totali nel blocco dopo gli articoli — valori numerici dopo le label
+  // Nel pdf.js i totali appaiono come:
+  //   [212] 465,48   ← TOTALE IMPONIBILE
+  //   [213] 46,55    ← TOTALE IMPOSTA
+  //   [214] 512,03   ← TOTALE DOCUMENTO
+  // Cerchiamo 3 numeri consecutivi vicino a "VETTORE"
+  const vettIdx=neFind(v=>v==='VETTORE',artEnd>0?artEnd:150);
+  if(vettIdx>=0){
+    const nearNums=[];
+    for(let j=vettIdx-5;j<Math.min(vettIdx+5,ne.length);j++){
+      if(j>=0 && /^\d[\d.,]+$/.test(ne[j])) nearNums.push(parseIT(ne[j]));
+    }
+    console.log('[MARR] totali near VETTORE:', nearNums);
+    if(nearNums.length>=3){
+      totImp=nearNums[nearNums.length-3];
+      totIva=nearNums[nearNums.length-2];
+      totDoc=nearNums[nearNums.length-1];
+    }
+  }
+
+  // Fallback: cerca dopo "TOTALE DOCUMENTO"
+  if(!totDoc){
+    const tdocIdx=neFind(v=>v==='TOTALE DOCUMENTO');
+    if(tdocIdx>=0){
+      for(let j=tdocIdx+1;j<Math.min(tdocIdx+4,ne.length);j++){
+        if(/^\d[\d.,]+$/.test(ne[j])){totDoc=parseIT(ne[j]);break;}
+      }
+    }
+  }
+
+  if(!totImp) totImp=Math.round(items.reduce((s,it)=>s+it.importo,0)*100)/100;
+  if(!totDoc) totDoc=Math.round((totImp+totIva)*100)/100;
+
+  return {fornitore:'MARR S.p.A.', ordNum, dataDoc:dataOrd, dataOrd, dataCons,
+          store, operatore:'', codCliente, pagamento, items, totImp, totIva, totDoc};
+}
+
+async function parsePDFText(text){
+  // Debug: log prime 200 chars per capire cosa arriva
+  console.log('[MARR Parser] Testo estratto (primi 500 char):', text.substring(0,500));
+  console.log('[MARR Parser] Contiene "MARR":', text.includes('MARR'));
+  console.log('[MARR Parser] Contiene "marr@marr.it":', text.includes('marr@marr.it'));
+  console.log('[MARR Parser] Contiene "Cremonini":', text.includes('Cremonini'));
+  console.log('[MARR Parser] Contiene "DDT/FAT":', text.includes('DDT/FAT'));
+
+  if(text.includes('MARR S.p.A') || text.includes('marr@marr.it') ||
+     text.includes('MARR S.p.a') || text.includes('Cremonini') ||
+     text.includes('DDT/FAT.CORTESIA'))
+    return parseMARR(text);
+  throw new Error('Questo non sembra un DDT/Fattura MARR S.p.A. Verificare il file. (Nessuna firma MARR trovata nel testo)');
+}
+
+async function extractPDFText(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=async(e)=>{
+      try{
+        const pdf=await pdfjsLib.getDocument({data:e.target.result}).promise;
+        let fullText='';
+        for(let p=1;p<=pdf.numPages;p++){
+          const page=await pdf.getPage(p);
+          const tc=await page.getTextContent();
+          let prevY=null;
+          for(const item of tc.items){
+            const y=Math.round(item.transform[5]);
+            const str=item.str.trim();
+            if(!str) continue;
+            if(prevY!==null&&Math.abs(y-prevY)>3) fullText+='\n';
+            fullText+=str+'\n';
+            prevY=y;
+          }
+          fullText+='\f';
+        }
+        resolve(fullText);
+      }catch(err){reject(err)}
+    };
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+// PDF UI
+function dzOver(e){e.preventDefault();document.getElementById('dz').classList.add('drag')}
+function dzLeave(){document.getElementById('dz').classList.remove('drag')}
+function dzDrop(e){e.preventDefault();dzLeave();const f=e.dataTransfer.files[0];if(f)processPDF(f)}
+async function loadPDF(e){const f=e.target.files[0];if(f)await processPDF(f);e.target.value='';}
+
+async function processPDF(file){
+  setStep(1,'active');
+  const prog=document.getElementById('progWrap');
+  document.getElementById('parseError').innerHTML='';
+  prog.style.display='block';
+  setProgress(10,'Lettura DDT...');
+  document.getElementById('dzFileName').textContent=file.name;
+  try{
+    setProgress(30,'Estrazione testo...');
+    const rawText=await extractPDFText(file);
+    setProgress(60,'Analisi campi MARR...');
+    const parsed=await parsePDFText(rawText);
+    setProgress(90,'Controllo anomalie...');
+    currentParsed=parsed;
+    showPreview(parsed);
+    setProgress(100,'✅ Completato');
+    setTimeout(()=>{prog.style.display='none'},1200);
+  }catch(err){
+    prog.style.display='none';
+    document.getElementById('parseError').innerHTML=`<div class="alert alert-err mt8">❌ Errore: ${err.message}<br><span style="font-size:10px">Assicurati che il PDF sia un DDT/Fattura MARR S.p.A. non protetto.</span></div>`;
+    document.getElementById('dz').classList.add('error');
+    setTimeout(()=>document.getElementById('dz').classList.remove('error'),3000);
+  }
+}
+function setProgress(p,label){document.getElementById('progFill').style.width=p+'%';document.getElementById('progLabel').textContent=label;}
+
+function showPreview(p){
+  setStep(2,'active');setStep(1,'done');
+  document.getElementById('step1Block').style.display='none';
+  document.getElementById('step2Block').style.display='block';
+  document.getElementById('step3Block').style.display='none';
+  const fBadge=`<span style="padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700;background:#fde8eb;color:#c8102e">MARR S.p.A.</span>`;
+  document.getElementById('step2Head').innerHTML=`<span>✅ Dati estratti — ${fBadge}</span>
+    <button class="btn btn-ghost btn-sm" style="color:#fff;border-color:rgba(255,255,255,.5)" onclick="backToStep1()">← Carica altro</button>`;
+  document.getElementById('prev_num').value=p.ordNum||'';
+  document.getElementById('prev_store').value=p.store||'TUSCOLANA';
+  document.getElementById('prev_data').value=p.dataOrd||'';
+  document.getElementById('prev_cons').value=p.dataCons||'';
+  document.getElementById('prev_codcli').value=p.codCliente||'';
+  document.getElementById('prev_pag').value=p.pagamento||'';
+  renderPreviewRows(p.items);
+  updatePreviewTotals();
+  runAnomalyCheck(p);
+}
+
+function renderPreviewRows(items){
+  document.getElementById('prevRows').innerHTML=items.map((it,i)=>`
+    <tr>
+      <td class="tc muted">${i+1}</td>
+      <td style="font-size:10px;color:var(--muted)">${it.codice}</td>
+      <td><input value="${esc(it.desc)}" onchange="updateItem(${i},'desc',this.value)" style="min-width:250px"></td>
+      <td style="font-size:10px;color:var(--muted)">${it.lotto||'—'}</td>
+      <td><input value="${it.um}" onchange="updateItem(${i},'um',this.value)" style="width:45px;text-align:center"></td>
+      <td><input type="number" value="${it.qta}" step="0.01" onchange="updateItem(${i},'qta',+this.value);updatePreviewTotals()" style="width:65px;text-align:right"></td>
+      <td><input type="number" value="${it.prezzo_netto}" step="0.01" onchange="updateItem(${i},'prezzo_netto',+this.value);updateItem(${i},'importo',+(this.value*currentParsed.items[${i}].qta).toFixed(2));updatePreviewTotals()" style="width:75px;text-align:right"></td>
+      <td class="tc">${it.iva}%</td>
+      <td class="tr fb">${fmt(it.importo)}</td>
+      <td><button onclick="removeItem(${i})" style="background:none;border:none;cursor:pointer;color:#c8102e;font-size:15px;padding:2px 5px">✕</button></td>
+    </tr>`).join('');
+  updatePreviewTotals();
+}
+function updateItem(i,field,val){if(currentParsed&&currentParsed.items[i]) currentParsed.items[i][field]=val;}
+function removeItem(i){if(currentParsed){currentParsed.items.splice(i,1);renderPreviewRows(currentParsed.items);runAnomalyCheck(currentParsed);}}
+function addPrevRow(){
+  if(!currentParsed) return;
+  currentParsed.items.push({codice:'',desc:'',lotto:'',um:'KG',qta:0,prezzo:0,prezzo_netto:0,importo:0,iva:10});
+  renderPreviewRows(currentParsed.items);
+}
+function updatePreviewTotals(){
+  if(!currentParsed) return;
+  const totImp=currentParsed.items.reduce((s,i)=>s+i.importo,0);
+  const totIva=currentParsed.items.reduce((s,i)=>s+i.importo*(i.iva/100),0);
+  const totDoc=totImp+totIva;
+  document.getElementById('prevTotImp').textContent='€ '+fmt(totImp);
+  document.getElementById('prevTotals').innerHTML=`
+    <span style="margin-right:16px">Imponibile: <strong>€ ${fmt(totImp)}</strong></span>
+    <span style="margin-right:16px">IVA: <strong>€ ${fmt(totIva)}</strong></span>
+    <span style="font-size:14px;color:var(--blue)">Totale: <strong>€ ${fmt(totDoc)}</strong></span>`;
+  currentParsed.totImp=Math.round(totImp*100)/100;
+  currentParsed.totIva=Math.round(totIva*100)/100;
+  currentParsed.totDoc=Math.round(totDoc*100)/100;
+}
+function runAnomalyCheck(p){
+  const warns=[];
+  const existing=DB.orders.find(o=>String(o.id)===String(p.ordNum));
+  if(existing)
+    warns.push({type:'err',msg:`⚠️ DDT <strong>${p.ordNum}</strong> già presente nel database (${existing.store}, ${existing.data}, €${fmt(existing.tot)}, ${(existing.lines||[]).length} articoli).<br>Salvando <strong>sovrascriverai</strong> il DDT esistente.`});
+  if(!p.store) warns.push({type:'err',msg:'❌ Store non rilevato — selezionalo manualmente.'});
+  for(const item of p.items){
+    const lc=(DB.listino_concordato||[]).find(pr=>pr.cod===item.codice||(pr.desc&&pr.desc===item.desc));
+    if(lc&&item.prezzo_netto&&item.prezzo_netto>lc.price+0.01)
+      warns.push({type:'warn',msg:`⚠️ Prezzo superiore al listino concordato: <strong>${item.desc.substring(0,50)}</strong> — DDT: €${item.prezzo_netto} | Concordato: €${lc.price} (+€${(item.prezzo_netto-lc.price).toFixed(2)})`});
+  }
+  if(!p.dataCons||p.dataCons==='N/D') warns.push({type:'warn',msg:'🟡 Data consegna mancante.'});
+  if(p.items.length===0) warns.push({type:'err',msg:'❌ Nessun articolo rilevato.'});
+  const el=document.getElementById('anomalyCheck');
+  if(warns.length===0) el.innerHTML=`<div class="alert alert-ok">✅ Nessuna anomalia — ${p.items.length} articoli, totale €${fmt(p.totDoc)}</div>`;
+  else el.innerHTML=warns.map(w=>`<div class="alert ${w.type==='err'?'alert-err':'alert-warn'}">${w.msg}</div>`).join('');
+}
+
+function confirmSave(){
+  const ordNum=document.getElementById('prev_num').value.trim();
+  const store=document.getElementById('prev_store').value;
+  const dataOrd=document.getElementById('prev_data').value;
+  const dataCons=document.getElementById('prev_cons').value||'N/D';
+  const codCli=document.getElementById('prev_codcli').value;
+  if(!ordNum||!store||!dataOrd){document.getElementById('anomalyCheck').innerHTML=`<div class="alert alert-err">❌ N° DDT, store e data obbligatori.</div>`;return;}
+  const existIdx=DB.orders.findIndex(o=>String(o.id)===ordNum);
+  const p=currentParsed;
+  const totImp=p.items.reduce((s,i)=>s+i.importo,0);
+  const totIva=p.items.reduce((s,i)=>s+i.importo*(i.iva/100),0);
+  const totDoc=totImp+totIva;
+  const newOrd={id:ordNum,store,data:dataOrd,cons:dataCons,op:codCli||'',
+    imp:Math.round(totImp*100)/100,iva_v:Math.round(totIva*100)/100,tot:Math.round(totDoc*100)/100,
+    lines:p.items,source:'pdf',pagamento:p.pagamento};
+  if(existIdx>=0) DB.orders[existIdx]=newOrd; else DB.orders.push(newOrd);
+  // Anomalies — prezzo superiore al listino concordato
+  for(const item of p.items){
+    const lc=(DB.listino_concordato||[]).find(pr=>pr.cod===item.codice||(pr.desc&&pr.desc===item.desc));
+    if(lc&&item.prezzo_netto&&item.prezzo_netto>lc.price+0.01)
+      DB.anomalies.push({n:DB.anomalies.length+1,cat:'PREZZO',tipo:'Prezzo superiore al listino concordato',cert:'CERTA',store,ordine:ordNum,det:`${item.desc}\nDDT €${item.prezzo_netto} vs concordato €${lc.price} (+€${(item.prezzo_netto-lc.price).toFixed(2)})`});
+  }
+  // Auto-update listino — tiene il prezzo PIÙ BASSO
+  for(const item of p.items){
+    if(!item.codice||!item.desc) continue;
+    const existing=DB.products.find(pr=>pr.cod===item.codice);
+    if(existing){
+      if(item.prezzo_netto>0&&item.prezzo_netto<existing.price) existing.price=item.prezzo_netto;
+      existing.updated=dataOrd;
+    } else{DB.products.push({cod:item.codice,desc:item.desc,um:item.um||'KG',price:item.prezzo_netto||0,iva:item.iva||10,updated:dataOrd});}
+  }
+  if(!dataCons||dataCons==='N/D')
+    DB.anomalies.push({n:DB.anomalies.length+1,cat:'DATI MANCANTI',tipo:'Data consegna mancante',cert:'CERTA',store,ordine:ordNum,det:'Data consegna mancante'});
+  // Ordina tutti gli ordini per data (più vecchi prima)
+  DB.orders.sort((a,b)=>{
+    const da=(a.data||'').split('/').reverse().join('');
+    const db=(b.data||'').split('/').reverse().join('');
+    return da.localeCompare(db);
+  });
+  refreshAll();
+  setStep(3,'active');setStep(2,'done');
+  document.getElementById('step2Block').style.display='none';
+  document.getElementById('step3Block').style.display='block';
+  const nAnoms=DB.anomalies.filter(a=>a.ordine===ordNum).length;
+  document.getElementById('saveConfirmMsg').innerHTML=`
+    <div class="alert alert-ok">✅ DDT <strong>${ordNum}</strong> salvato — ${storePill(store)}
+    &nbsp;·&nbsp;${dataOrd} → ${dataCons}
+    &nbsp;·&nbsp;<strong>${p.items.length}</strong> articoli&nbsp;·&nbsp;Totale: <strong>€ ${fmt(totDoc)}</strong>
+    ${nAnoms>0?`<br><span class="abadge a-warn mt8">⚠️ ${nAnoms} anomalia/e</span>`:''}</div>`;
+  if(multiQueue.length>0) setTimeout(processNextInQueue,800);
+}
+
+function backToStep1(){
+  setStep(1,'active');setStep(2,'');setStep(3,'');
+  document.getElementById('step1Block').style.display='block';
+  document.getElementById('step2Block').style.display='none';
+  document.getElementById('step3Block').style.display='none';
+  currentParsed=null;
+}
+function setStep(n,cls){document.getElementById('st'+n).className='step'+(cls?' '+cls:'');}
+
+// Multi-file — auto-salva senza chiedere conferma
+async function loadMulti(e){multiQueue=[...e.target.files];e.target.value='';renderQueue();if(multiQueue.length>0) processNextInQueue();}
+async function processNextInQueue(){
+  if(multiQueue.length===0) return;
+  const file=multiQueue.shift();
+  renderQueue();
+  await processPDF(file);
+  if(currentParsed){
+    const numFattura=String(currentParsed.ordNum||currentParsed.numFattura||'');
+    if(numFattura && DB.orders.find(o=>String(o.id)===numFattura)){
+      showStatus(`⚠️ DDT #${numFattura} già presente — saltato`,'warn');
+      currentParsed=null;
+      if(multiQueue.length>0) setTimeout(processNextInQueue,600);
+      return;
+    }
+    confirmSave();
+  }
+}
+function renderQueue(){
+  const el=document.getElementById('multiQueue');
+  if(multiQueue.length===0){el.innerHTML='';return;}
+  el.innerHTML=`<div class="alert alert-info">📦 In coda: <strong>${multiQueue.length}</strong> DDT — ${multiQueue.map(f=>f.name).join(', ')}</div>`;
+}
+
+// PRODUCT MODAL
+function renderProds(){
+  document.getElementById('prodBody').innerHTML=DB.products.map((p,i)=>`
+    <tr><td class="tc muted">${i+1}</td><td style="font-size:10px;color:var(--muted)">${p.cod||'—'}</td>
+    <td class="fb">${p.desc}</td><td class="tc">${p.um}</td><td class="tr fb mono">€${p.price.toFixed(2)}</td><td class="tc">${p.iva}%</td>
+    <td><button class="btn btn-ghost btn-sm" onclick="editProd(${i})">✏️</button></td></tr>`).join('');
+}
+function openProdModal(idx=-1){
+  document.getElementById('mp_idx').value=idx;
+  if(idx>=0){const p=DB.products[idx];document.getElementById('mp_cod').value=p.cod||'';document.getElementById('mp_desc').value=p.desc||'';document.getElementById('mp_um').value=p.um||'KG';document.getElementById('mp_price').value=p.price||'';document.getElementById('mp_iva').value=p.iva||10;}
+  else{['mp_cod','mp_desc','mp_price'].forEach(id=>document.getElementById(id).value='');}
+  document.getElementById('prodModal').classList.add('open');
+}
+function editProd(i){openProdModal(i);}
+function closeProdModal(){document.getElementById('prodModal').classList.remove('open');}
+function saveProd(){
+  const idx=parseInt(document.getElementById('mp_idx').value);
+  const obj={cod:document.getElementById('mp_cod').value.trim(),desc:document.getElementById('mp_desc').value.trim(),um:document.getElementById('mp_um').value,price:parseFloat(document.getElementById('mp_price').value)||0,iva:parseInt(document.getElementById('mp_iva').value),updated:new Date().toLocaleDateString('it-IT')};
+  if(!obj.desc||!obj.price){alert('Descrizione e prezzo obbligatori');return;}
+  if(idx>=0) DB.products[idx]=obj; else DB.products.push(obj);
+  saveDB();renderProds();closeProdModal();
+}
+
+// EXPORT EXCEL
+function exportExcel(){
+  const wb=XLSX.utils.book_new();
+  const stores=[...new Set(DB.orders.map(o=>o.store))];
+  for(const store of stores){
+    const ords=DB.orders.filter(o=>o.store===store).sort((a,b)=>(a.data||'').localeCompare(b.data||''));
+    const data=[['N° DDT','Data Doc.','Data Cons.','Descrizione','Lotto','UM','Qtà','Prezzo €','IVA %','Importo €','Totale Doc €']];
+    for(const o of ords){
+      const lines=o.lines||[];
+      if(lines.length>0){lines.forEach((l,i)=>{if(i===0) data.push([o.id,o.data,o.cons,l.desc,l.lotto||'',l.um,l.qta,l.prezzo_netto||l.prezzo,l.iva,l.importo,o.tot]);else data.push([null,null,null,l.desc,l.lotto||'',l.um,l.qta,l.prezzo_netto||l.prezzo,l.iva,l.importo,null]);});}
+      else data.push([o.id,o.data,o.cons,null,null,null,null,null,null,null,o.tot]);
+    }
+    const ws=XLSX.utils.aoa_to_sheet(data);
+    ws['!cols']=[{wch:12},{wch:12},{wch:12},{wch:42},{wch:10},{wch:5},{wch:7},{wch:10},{wch:6},{wch:10},{wch:13}];
+    XLSX.utils.book_append_sheet(wb,ws,store);
+  }
+  const rt=[['Store','N° DDT','Data','Cons.','Fonte','Imponibile €','IVA €','Totale €']];
+  let sI=0,sV=0,sT=0;
+  DB.orders.sort((a,b)=>(a.data||'').localeCompare(b.data||'')).forEach(o=>{
+    const i=o.imp||0,v=o.iva_v||0,t=o.tot||0;
+    rt.push([o.store,o.id,o.data,o.cons,o.source,i,v,t]);sI+=i;sV+=v;sT+=t;
+  });
+  rt.push(['TOTALE','','','','',Math.round(sI*100)/100,Math.round(sV*100)/100,Math.round(sT*100)/100]);
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rt),'RIEPILOGO TOTALE');
+  const an=[['Categoria','Certezza','Store','N° DDT','Prodotto','Dettaglio']];
+  DB.anomalies.forEach(a=>an.push([a.cat,a.cert,a.store,a.ordine,a.prod,a.det]));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(an),'ANOMALIE');
+  XLSX.writeFile(wb,`tismasho_marr_master_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+// TAB NAVIGATION
+function showTab(id){
+  const ids=['dashboard','carica','store','ordini','settimane','anomalie','credito','listino_concordato','listino'];
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',ids[i]===id));
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  if(id==='store') renderStoreDetail();
+  if(id==='settimane') renderWeekly();
+  if(id==='listino') renderProds();
+  if(id==='credito') renderCredito();
+  if(id==='listino_concordato') renderListinoConcordato();
+}
+
+// DASHBOARD
+function renderDashboard(){
+  const totOrd=DB.orders.length;
+  const totLines=DB.orders.reduce((s,o)=>s+(o.lines||[]).length,0);
+  const totImp=DB.orders.reduce((s,o)=>s+(o.imp||0),0);
+  const totIva=DB.orders.reduce((s,o)=>s+(o.iva_v||0),0);
+  const totTot=DB.orders.reduce((s,o)=>s+(o.tot||0),0);
+  const pdfCount=DB.orders.filter(o=>o.source==='pdf').length;
+  document.getElementById('statsGrid').innerHTML=`
+    <div class="stat"><div class="stat-lbl">DDT totali</div><div class="stat-val">${totOrd}</div><div class="stat-sub">${pdfCount} da PDF</div></div>
+    <div class="stat b"><div class="stat-lbl">Righe prodotto</div><div class="stat-val">${totLines}</div><div class="stat-sub">${totOrd>0?(totLines/totOrd).toFixed(1):0}/DDT</div></div>
+    <div class="stat"><div class="stat-lbl">Imponibile</div><div class="stat-val">€${fmt(totImp)}</div><div class="stat-sub">netto IVA</div></div>
+    <div class="stat o"><div class="stat-lbl">Anomalie</div><div class="stat-val">${DB.anomalies.length}</div><div class="stat-sub">${DB.anomalies.filter(a=>(a.cert||'').includes('CERTA')).length} certe</div></div>
+    <div class="stat r"><div class="stat-lbl">Totale complessivo</div><div class="stat-val">€${fmt(totTot)}</div><div class="stat-sub">IVA inclusa</div></div>`;
+  // Riepilogo per store (dynamic from orders)
+  const storeMap={};
+  DB.orders.forEach(o=>{
+    if(!storeMap[o.store]) storeMap[o.store]={n:0,imp:0,iva:0,tot:0};
+    storeMap[o.store].n++;storeMap[o.store].imp+=o.imp||0;storeMap[o.store].iva+=o.iva_v||0;storeMap[o.store].tot+=o.tot||0;
+  });
+  document.getElementById('riepilogoBody').innerHTML=Object.entries(storeMap).map(([s,r])=>`<tr>
+    <td>${storePill(s)}</td><td class="tc mono">${r.n}</td>
+    <td class="tr mono">€${fmt(r.imp)}</td><td class="tr mono">€${fmt(r.iva)}</td>
+    <td class="tr mono fb">€${fmt(r.tot)}</td><td class="tr mono">${totTot>0?(r.tot/totTot*100).toFixed(1):'0'}%</td></tr>`).join('');
+  document.getElementById('riepilogoFoot').innerHTML=`<tr><td class="fb">TOTALE</td><td class="tc fb mono">${totOrd}</td><td class="tr fb mono">€${fmt(totImp)}</td><td class="tr fb mono">€${fmt(totIva)}</td><td class="tr fb mono">€${fmt(totTot)}</td><td class="tr fb mono">100%</td></tr>`;
+  // Anomaly summary
+  const certCount=DB.anomalies.filter(a=>(a.cert||'').includes('CERTA')).length;
+  const verCount=DB.anomalies.length-certCount;
+  let ah=DB.anomalies.length>0?`<div style="margin-bottom:12px"><span class="abadge a-certa">🔴 ${certCount} certe</span> &nbsp; <span class="abadge a-warn">🟡 ${verCount} da verificare</span></div>`:'';
+  if(DB.anomalies.length===0) ah+='<div class="alert alert-ok">✅ Nessuna anomalia rilevata</div>';
+  else DB.anomalies.slice(0,8).forEach(a=>{ah+=`<div style="padding:6px 0;border-bottom:1px solid #f0f1f3;font-size:11px">${certBadge(a.cert)} <span class="fb">${a.cat}</span> — ${(a.det||'').split('\n')[0].substring(0,80)}</div>`;});
+  if(DB.anomalies.length>8) ah+=`<div class="mt8"><button class="btn btn-ghost btn-sm" onclick="showTab('anomalie')">Tutte le ${DB.anomalies.length} anomalie →</button></div>`;
+  document.getElementById('dashAnom').innerHTML=ah;
+  // Orders
+  const sorted=[...DB.orders].sort((a,b)=>(b.data||'').localeCompare(a.data||''));
+  document.getElementById('dashOrders').innerHTML=sorted.slice(0,15).map(o=>`<tr>
+    <td class="fb mono">${o.id}</td><td>${storePill(o.store)}</td><td>${o.data}</td><td>${o.cons||'—'}</td><td class="tc">${(o.lines||[]).length}</td>
+    <td class="tr mono">€${fmt(o.imp)}</td><td class="tr mono">€${fmt(o.iva_v)}</td><td class="tr mono fb">€${fmt(o.tot)}</td><td>${sourceBadge(o.source)}</td></tr>`).join('');
+  document.getElementById('topbarInfo').textContent=`MARR S.p.A. (Gruppo Cremonini) · FEBBRAIO 2026 · ${totOrd} DDT · ${pdfCount} da PDF`;
+  document.getElementById('anomBadge').textContent=DB.anomalies.length;
+}
+
+// STORE DETAIL
+function renderStoreDetail(){
+  const store=document.getElementById('storeFilter').value;
+  const ords=DB.orders.filter(o=>o.store===store).sort((a,b)=>(a.data||'').localeCompare(b.data||''));
+  const totImp=ords.reduce((s,o)=>s+(o.imp||0),0);
+  const totTot=ords.reduce((s,o)=>s+(o.tot||0),0);
+  const totLines=ords.reduce((s,o)=>s+(o.lines||[]).length,0);
+  let html=`<div class="stats" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px">
+    <div class="stat"><div class="stat-lbl">DDT</div><div class="stat-val">${ords.length}</div></div>
+    <div class="stat b"><div class="stat-lbl">Righe</div><div class="stat-val">${totLines}</div></div>
+    <div class="stat"><div class="stat-lbl">Imponibile</div><div class="stat-val">€${fmt(totImp)}</div></div>
+    <div class="stat o"><div class="stat-lbl">Totale</div><div class="stat-val">€${fmt(totTot)}</div></div></div>`;
+  if(ords.length===0) html+='<div class="alert alert-info">Nessun DDT per questo store. Carica un DDT MARR per popolare i dati.</div>';
+  ords.forEach(o=>{
+    const lines=o.lines||[];
+    html+=`<div class="card"><div class="card-head neutral expand-btn" onclick="this.nextElementSibling.classList.toggle('open')">
+      <span>📦 <strong class="mono">${o.id}</strong> — ${o.data} — <strong>€${fmt(o.tot)}</strong> (${lines.length} righe) ${sourceBadge(o.source)}</span><span style="font-size:18px">▸</span>
+    </div><div class="expand-content"><div style="padding:12px 16px;font-size:11px;color:var(--muted)">Data: ${o.data} · Cons: ${o.cons||'N/D'} · Imp: €${fmt(o.imp)} · IVA: €${fmt(o.iva_v)}</div>
+    <div class="scroll-x"><table class="dtable"><thead><tr><th>#</th><th>Descrizione</th><th>Lotto</th><th>UM</th><th class="tr">Qtà</th><th class="tr">Prezzo €</th><th class="tc">IVA %</th><th class="tr">Importo €</th></tr></thead>
+    <tbody>${lines.map((l,i)=>`<tr><td class="tc muted">${i+1}</td><td class="fb">${l.desc}</td><td style="font-size:10px;color:var(--muted)">${l.lotto||'—'}</td><td class="tc">${l.um}</td><td class="tr mono">${fmtI(l.qta)}</td><td class="tr mono">€${fmt(l.prezzo)}</td><td class="tc">${l.iva}%</td><td class="tr mono fb">€${fmt(l.importo)}</td></tr>`).join('')}</tbody>
+    <tfoot><tr><td colspan="7" class="tr fb">TOTALE</td><td class="tr fb mono">€${fmt(lines.reduce((s,l)=>s+l.importo,0))}</td></tr></tfoot></table></div></div></div>`;
+  });
+  document.getElementById('storeDetailOut').innerHTML=html;
+}
+
+// ALL ORDERS
+function checkDeletePassword(){
+  const pwd=prompt('🔒 Inserisci la password per confermare la cancellazione:');
+  if(pwd!=='Donts2022'){alert('❌ Password errata. Operazione annullata.');return false;}
+  return true;
+}
+
+function deleteOrder(id){
+  const o=DB.orders.find(o=>o.id===id);
+  if(!o) return;
+  if(!checkDeletePassword()) return;
+  if(!confirm(`🗑 Vuoi eliminare il DDT ${id} (${o.store}, ${o.data}, €${fmt(o.tot)})?\n\nQuesta azione è irreversibile.`)) return;
+  DB.orders=DB.orders.filter(o=>o.id!==id);
+  DB.anomalies=DB.anomalies.filter(a=>a.ordine!==id);
+  document.getElementById('orderDetail').innerHTML='';
+  refreshAll();renderProds();
+}
+
+function renderAllOrders(){
+  const search=(document.getElementById('searchOrd').value||'').toLowerCase();
+  const sf=document.getElementById('filterOrdStore').value;
+  const src=document.getElementById('filterOrdSource').value;
+  let filtered=DB.orders;
+  if(sf) filtered=filtered.filter(o=>o.store===sf);
+  if(src) filtered=filtered.filter(o=>o.source===src);
+  if(search) filtered=filtered.filter(o=>o.id.toLowerCase().includes(search)||o.store.toLowerCase().includes(search));
+  // Ordina per data (dd/mm/yyyy → confronto corretto)
+  filtered.sort((a,b)=>{
+    const da=(a.data||'').split('/').reverse().join('');
+    const db=(b.data||'').split('/').reverse().join('');
+    return da.localeCompare(db);
+  });
+  const totImp=filtered.reduce((s,o)=>s+(o.imp||0),0);
+  const totIva=filtered.reduce((s,o)=>s+(o.iva_v||0),0);
+  const totTot=filtered.reduce((s,o)=>s+(o.tot||0),0);
+  document.getElementById('ordersBody').innerHTML=filtered.map(o=>`<tr>
+    <td class="fb mono" style="cursor:pointer" onclick="showOrderDetail('${o.id}')">${o.id}</td><td>${storePill(o.store)}</td><td>${o.data}</td><td>${o.cons||'—'}</td><td class="tc">${(o.lines||[]).length}</td>
+    <td class="tr mono">€${fmt(o.imp)}</td><td class="tr mono">€${fmt(o.iva_v)}</td><td class="tr mono fb">€${fmt(o.tot)}</td><td>${sourceBadge(o.source)}</td>
+    <td class="tc"><button onclick="event.stopPropagation();deleteOrder('${o.id}')" style="background:none;border:none;cursor:pointer;color:#c8102e;font-size:14px" title="Elimina DDT">🗑</button></td></tr>`).join('');
+  document.getElementById('ordersFoot').innerHTML=`<td class="fb">TOTALE</td><td></td><td></td><td></td><td class="tc fb">${filtered.reduce((s,o)=>s+(o.lines||[]).length,0)}</td>
+    <td class="tr fb mono">€${fmt(totImp)}</td><td class="tr fb mono">€${fmt(totIva)}</td><td class="tr fb mono">€${fmt(totTot)}</td><td></td><td></td>`;
+}
+function showOrderDetail(id){
+  const o=DB.orders.find(o=>o.id===id);if(!o) return;
+  const lines=o.lines||[];
+  document.getElementById('orderDetail').innerHTML=`<div class="card mt14"><div class="card-head green flexb"><span>📦 Dettaglio DDT ${o.id} — ${o.store}</span><button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4)" onclick="deleteOrder('${o.id}')">🗑 Elimina DDT</button></div>
+    <div style="padding:12px 16px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border)">Data: <strong>${o.data}</strong> · Cons: <strong>${o.cons||'N/D'}</strong> · Imp: <strong>€${fmt(o.imp)}</strong> · IVA: <strong>€${fmt(o.iva_v)}</strong> · Tot: <strong>€${fmt(o.tot)}</strong></div>
+    <div class="scroll-x"><table class="dtable green"><thead><tr><th>#</th><th>Descrizione</th><th>Lotto</th><th>UM</th><th class="tr">Qtà</th><th class="tr">Prezzo €</th><th class="tc">IVA %</th><th class="tr">Importo €</th></tr></thead>
+    <tbody>${lines.map((l,i)=>`<tr><td class="tc">${i+1}</td><td class="fb">${l.desc}</td><td style="font-size:10px;color:var(--muted)">${l.lotto||'—'}</td><td class="tc">${l.um}</td><td class="tr mono">${fmtI(l.qta)}</td><td class="tr mono">€${fmt(l.prezzo)}</td><td class="tc">${l.iva}%</td><td class="tr mono fb">€${fmt(l.importo)}</td></tr>`).join('')}</tbody>
+    <tfoot><tr><td colspan="7" class="tr fb">TOTALE DOCUMENTO</td><td class="tr fb mono">€${fmt(o.tot)}</td></tr></tfoot></table></div></div>`;
+  document.getElementById('orderDetail').scrollIntoView({behavior:'smooth'});
+}
+
+// WEEKLY (dynamic from orders)
+function getWeek(d){
+  if(!d||d==='N/D') return null;
+  const day=parseInt((d.split('/')[0]||'0'));
+  if(day<=7) return 1;if(day<=14) return 2;if(day<=21) return 3;return 4;
+}
+const wkColors={1:'#dce6f1',2:'#fce4d6',3:'#e2efda',4:'#fff2cc'};
+const wkLabels={1:'S1: 01–07 feb',2:'S2: 08–14 feb',3:'S3: 15–21 feb',4:'S4: 22–28 feb+'};
+function renderWeekly(){
+  const sf=document.getElementById('weekStore').value;
+  const allStores=[...new Set(DB.orders.map(o=>o.store).filter(Boolean))];
+  const stores=sf==='ALL'?allStores:[sf];
+  let html='';
+  if(DB.orders.length===0){document.getElementById('weeklyOut').innerHTML='<div class="alert alert-info">Nessun DDT. Carica DDT MARR per vedere il riepilogo.</div>';return;}
+  for(const store of stores){
+    const sords=DB.orders.filter(o=>o.store===store);
+    if(sords.length===0) continue;
+    const totTot=sords.reduce((s,o)=>s+(o.tot||0),0);
+    html+=`<div class="card"><div class="card-head blue flexb"><span>🏪 ${store}</span><span style="font-size:11px;opacity:.85">Totale: €${fmt(totTot)} · ${sords.length} DDT</span></div>
+    <div class="scroll-x"><table class="dtable"><thead><tr><th>Settimana</th><th>N° DDT</th><th>Data</th><th>Cons.</th><th>Righe</th><th>Fonte</th><th class="tr">Imp. €</th><th class="tr">IVA €</th><th class="tr">Tot. €</th></tr></thead><tbody>`;
+    for(const wk of [1,2,3,4]){
+      const wo=sords.filter(o=>getWeek(o.data)===wk);
+      if(wo.length===0) continue;
+      const wI=wo.reduce((s,o)=>s+(o.imp||0),0);
+      html+=`<tr><td colspan="9" style="background:${wkColors[wk]};font-weight:700;color:#1f4e79;padding:7px 10px;font-size:12px">${wkLabels[wk]} — ${wo.length} DDT · €${fmt(wI)}</td></tr>`;
+      wo.forEach(o=>{html+=`<tr><td class="muted" style="font-size:10px">${wkLabels[wk]}</td><td class="fb mono">${o.id}</td><td>${o.data}</td><td>${o.cons||'—'}</td><td class="tc">${(o.lines||[]).length}</td><td>${sourceBadge(o.source)}</td><td class="tr mono">€${fmt(o.imp)}</td><td class="tr mono">€${fmt(o.iva_v)}</td><td class="tr mono fb">€${fmt(o.tot)}</td></tr>`;});
+    }
+    html+=`</tbody></table></div></div>`;
+  }
+  document.getElementById('weeklyOut').innerHTML=html||'<div class="alert alert-info">Nessun DDT per questo store.</div>';
+}
+
+// ANOMALIES
+function renderAnom(){
+  const catF=document.getElementById('fAnomCat').value;
+  const certF=document.getElementById('fAnomCert').value;
+  let filtered=DB.anomalies;
+  if(catF) filtered=filtered.filter(a=>a.cat===catF);
+  if(certF) filtered=filtered.filter(a=>(a.cert||'').includes(certF));
+  if(filtered.length===0){document.getElementById('anomBody').innerHTML='<div class="alert alert-ok">✅ Nessuna anomalia rilevata.</div>';return;}
+  const cats=['PREZZO','QUANTITÀ','NOME PRODOTTO','DATI MANCANTI'];
+  let html='';
+  for(const cat of cats){
+    const items=filtered.filter(a=>a.cat===cat);if(items.length===0) continue;
+    const icon=cat==='PREZZO'?'💰':cat==='QUANTITÀ'?'📦':cat==='NOME PRODOTTO'?'🏷️':'❓';
+    html+=`<div class="section-hd mt14">${icon} ${cat} (${items.length})</div>`;
+    items.forEach(a=>{
+      html+=`<div style="padding:12px 0;border-bottom:1px solid #f0f1f3"><div class="flexb"><div>${certBadge(a.cert)} <span class="fb" style="margin-left:6px">#${a.n} — ${a.tipo||a.cat}</span></div>
+        <span class="muted" style="font-size:11px">${storePill(a.store)} · ${a.ordine}</span></div><div class="anom-detail">${(a.det||'').split('\n').join('\n')}</div></div>`;
+    });
+  }
+  document.getElementById('anomBody').innerHTML=html;
+}
+
+// REFRESH
+function renderCredito(){
+  const esito=(DB.note_credito||[]).find(l=>l.includes("ESITO VERIFICA"));
+  const isOk=!esito||esito.includes("Nessuna");
+  let html=isOk
+    ?`<div class="alert alert-ok" style="margin-bottom:16px">✅ <strong>ESITO:</strong> Nessuna nota di credito presente nei documenti analizzati</div>`
+    :`<div class="alert alert-err" style="margin-bottom:16px">⚠️ <strong>ESITO:</strong> Note di credito rilevate — verificare</div>`;
+  html+="<div class=\"section-hd\">Dettaglio verifica per blocco</div>";
+  (DB.note_credito||[]).forEach(line=>{
+    if(line.includes("NOTE DI CREDITO —")||line.includes("Verifica effettuata")||line.includes("ESITO VERIFICA")) return;
+    if(line.includes("SEZIONE")){html+=`<div class="section-hd mt14">${line}</div>`;return;}
+    html+=`<div class="nc-item">${line}</div>`;
+  });
+  document.getElementById("creditoBody").innerHTML=html;
+}
+// LISTINO CONCORDATO RENDER
+function renderListinoConcordato(){
+  const q=(document.getElementById('searchLC')||{}).value||'';
+  const ql=q.toLowerCase();
+  const items=(DB.listino_concordato||[]).filter(p=>
+    !ql||p.desc.toLowerCase().includes(ql)||p.cod.includes(ql)
+  );
+  const fmt2=n=>n!=null?Number(n).toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';
+  let rows='';
+  let totQta=0, totTot=0;
+  items.forEach(p=>{
+    totQta+=Number(p.qta)||0;
+    totTot+=Number(p.tot)||0;
+    rows+=`<tr>
+      <td><span class="cod">${p.cod}</span></td>
+      <td style="font-size:12px">${p.desc}</td>
+      <td style="text-align:center">${p.um}</td>
+      <td class="tr" style="font-weight:600">€ ${fmt2(p.price)}</td>
+      <td class="tr">${p.qta} ${p.um}</td>
+      <td class="tr">€ ${fmt2(p.tot)}</td>
+      <td style="font-size:11px;color:var(--muted)">${p.ultimo_ord||'—'}</td>
+    </tr>`;
+  });
+  const tbody=document.getElementById('listinoBody');
+  if(tbody) tbody.innerHTML=rows||'<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">Nessun prodotto trovato</td></tr>';
+  const tfoot=document.getElementById('listinoFoot');
+  if(tfoot) tfoot.innerHTML=`<td colspan="3" style="padding:8px 10px;font-size:12px">${items.length} prodotti</td><td class="tr" style="padding:8px 10px">—</td><td class="tr" style="padding:8px 10px">${totQta.toFixed(0)} unità</td><td class="tr" style="padding:8px 10px">€ ${fmt2(totTot)}</td><td></td>`;
+}
+
+function refreshAll(){saveDB();renderDashboard();renderAllOrders();renderAnom();}
+
+// INIT
+function resetDB(){if(!confirm('⚠️ Vuoi cancellare tutti i dati e tornare ai valori iniziali?')) return;localStorage.removeItem(DB_KEY);location.reload();}
+function init(){
+  renderDashboard();renderAllOrders();renderAnom();renderProds();renderCredito();renderListinoConcordato();
+  // Carica da Supabase (sovrascrive localStorage se ci sono dati)
+  sbLoadAll();
+}
+init();
+</script>
+</body>
+</html>
