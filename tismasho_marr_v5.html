@@ -148,7 +148,7 @@ input:focus,select:focus{outline:none;border-color:var(--blue);background:#fff}
     const v = document.getElementById('pwdInput').value;
     if(v === PWD){
       sessionStorage.setItem(KEY,'1');
-      document.getElementById('lockScreen').style.display='none';
+      const ls2=document.getElementById('lockScreen');if(ls2)ls2.parentNode.removeChild(ls2);
     } else {
       document.getElementById('pwdErr').textContent = '❌ Password errata';
       document.getElementById('pwdInput').value='';
@@ -946,7 +946,7 @@ function confirmSave(){
     if(!pr||pr<=0) continue;
     const storicoDesc=(item.desc||'').substring(0,30);
     const prezziStorici=[];
-    for(const ord of DB.orders.filter(o=>o.id!==numFattura)){
+    for(const ord of DB.orders.filter(o=>o.id!==ordNum)){
       for(const line of (ord.lines||[])){
         const ld=(line.desc||'').substring(0,30);
         if((item.codice&&line.codice===item.codice)||(storicoDesc&&ld===storicoDesc)){
@@ -960,7 +960,7 @@ function confirmSave(){
       const refMin=prezziStorici.find(x=>x.prezzo===prezzoMin);
       if(pr>prezzoMin+0.01){
         const diffMin=pr-prezzoMin;
-        DB.anomalies.push({n:DB.anomalies.length+1,cat:'PREZZO',tipo:'Prezzo superiore al minimo storico',cert:'🟡 DA VERIFICARE',store,ordine:numFattura,
+        DB.anomalies.push({n:DB.anomalies.length+1,cat:'PREZZO',tipo:'Prezzo superiore al minimo storico',cert:'🟡 DA VERIFICARE',store,ordine:ordNum,
           det:`${item.desc}\nPrezzo attuale: €${pr.toFixed(3)} | Minimo storico: €${prezzoMin.toFixed(3)} (ord. ${refMin.ordine} — ${refMin.store}, ${refMin.data}) | Differenza: +€${diffMin.toFixed(3)}`});
       }
     }

@@ -157,7 +157,7 @@ input:focus,select:focus{outline:none;border-color:var(--blue);background:#fff}
     const v = document.getElementById('pwdInput').value;
     if(v === PWD){
       sessionStorage.setItem(KEY,'1');
-      document.getElementById('lockScreen').style.display='none';
+      const ls2=document.getElementById('lockScreen');if(ls2)ls2.parentNode.removeChild(ls2);
     } else {
       document.getElementById('pwdErr').textContent = '❌ Password errata';
       document.getElementById('pwdInput').value='';
